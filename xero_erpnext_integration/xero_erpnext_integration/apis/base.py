@@ -80,7 +80,7 @@ class XeroBase:
             # Prepare data for token request (OAuth 2.0 client credentials flow)
             token_data = {
                 "grant_type": "client_credentials",
-                "scope": "accounting.transactions accounting.contacts accounting.settings"  # Adjust scopes as needed
+                "scope": "app.connections"  # Adjust scopes as needed
             }
             
             # Make request to get access token
