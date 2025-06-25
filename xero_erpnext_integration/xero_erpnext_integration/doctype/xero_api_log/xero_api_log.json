@@ -12,6 +12,7 @@
   "column_break_gzuz",
   "api_url",
   "status_code",
+  "headers",
   "section_break_hise",
   "payload",
   "column_break_ffyz",
@@ -76,12 +77,17 @@
    "in_list_view": 1,
    "label": "Timestamp",
    "read_only": 1
+  },
+  {
+   "fieldname": "headers",
+   "fieldtype": "Data",
+   "label": "headers"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-25 01:23:31.296964",
+ "modified": "2025-06-25 01:35:47.285685",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero API Log",
