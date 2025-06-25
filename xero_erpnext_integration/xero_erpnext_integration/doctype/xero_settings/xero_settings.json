@@ -9,14 +9,19 @@
   "column_break_bynn",
   "debug_mode",
   "section_break_fizg",
-  "ccid",
-  "csec",
+  "base_url",
+  "client_id",
+  "client_secret",
   "tenant_id",
+  "tenant_name",
   "webhook_secret",
   "column_break_ftam",
+  "access_token_url",
   "access_token",
   "refresh_token",
-  "base_url"
+  "token_expires_at",
+  "scope",
+  "redirect_uri"
  ],
  "fields": [
   {
@@ -26,16 +31,6 @@
   {
    "fieldname": "section_break_fizg",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "ccid",
-   "fieldtype": "Data",
-   "label": "CCID"
-  },
-  {
-   "fieldname": "csec",
-   "fieldtype": "Password",
-   "label": "CSEC"
   },
   {
    "fieldname": "column_break_ftam",
@@ -64,12 +59,12 @@
   },
   {
    "fieldname": "access_token",
-   "fieldtype": "Data",
+   "fieldtype": "Password",
    "label": "Access Token"
   },
   {
    "fieldname": "refresh_token",
-   "fieldtype": "Data",
+   "fieldtype": "Password",
    "label": "Refresh Token"
   },
   {
@@ -77,13 +72,48 @@
    "fieldname": "enable",
    "fieldtype": "Check",
    "label": "Enable"
+  },
+  {
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "Client ID"
+  },
+  {
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret"
+  },
+  {
+   "fieldname": "tenant_name",
+   "fieldtype": "Data",
+   "label": "Tenant Name"
+  },
+  {
+   "fieldname": "access_token_url",
+   "fieldtype": "Data",
+   "label": "Access Token URL"
+  },
+  {
+   "fieldname": "token_expires_at",
+   "fieldtype": "Data",
+   "label": "Token Expires At"
+  },
+  {
+   "fieldname": "scope",
+   "fieldtype": "Data",
+   "label": "Scope"
+  },
+  {
+   "fieldname": "redirect_uri",
+   "fieldtype": "Data",
+   "label": "Redirect URI"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-25 01:35:07.208105",
+ "modified": "2025-06-25 12:08:43.744502",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",
