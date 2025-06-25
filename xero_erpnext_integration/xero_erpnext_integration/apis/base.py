@@ -1,5 +1,6 @@
 import requests
 import frappe
+import base64
 from urllib.parse import urljoin
 from enum import Enum
 from frappe import _
@@ -22,8 +23,10 @@ class XeroBase:
         self.enabled = self.config.enable,
         self.enable_api_log = self.config.debug_mode
         self.client_id = self.config.ccid
+        
+        # Create Basic Auth header
         self.headers = {
-            "Authorization": self.client_secret,
+            "Authorization": self._create_basic_auth_header(),
             "Content-Type": "application/json"
         }
         self.log_data = {}
@@ -33,10 +36,26 @@ class XeroBase:
         else:
             frappe.throw(_("Please enable <strong>Xero</strong> integration."), title=_("Integration Disabled"))
 
+    def _create_basic_auth_header(self):
+        """Create Basic Authentication header using client_id as username and client_secret as password"""
+        if not self.client_id or not self.client_secret:
+            return ""
+        
+        # Create the credentials string: username:password
+        credentials = f"{self.client_id}:{self.client_secret}"
+        
+        # Encode to base64
+        encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('ascii')
+        
+        # Return the Basic Auth header
+        return f"Basic {encoded_credentials}"
 
     def validate_credentials(self):
         if not self.client_secret:
             frappe.throw(_("Please set <strong>Xero</strong> API key."), title=_("API Key Is Missing"))
+        
+        if not self.client_id:
+            frappe.throw(_("Please set <strong>Xero</strong> Client ID."), title=_("Client ID Is Missing"))
 
     def get(self, endpoint=None, params=None, headers=None):
         return self._make_request(SupportedHTTPMethod.GET, endpoint=endpoint, params=params, headers=headers)
@@ -55,9 +74,9 @@ class XeroBase:
         url = self._build_url(endpoint, method)
         request_headers = {**self.headers, **(headers or {})}
 
-        # Ensure API key is always included in params
+        # Remove the API key from params since we're using Basic Auth now
         params = params or {}
-        params["key"] = self.client_secret
+        # params["key"] = self.client_secret  # Remove this line
 
         self._prepare_log(url, params, json, request_headers)
 
@@ -76,11 +95,18 @@ class XeroBase:
             self.create_connection_log(
                 status=402,
                 message="Error",
-                response=response.text,
+                response=response.text if 'response' in locals() else str(e),
                 method=method,
                 payload=str(json),
             )
-            frappe.throw(_("Xero API request failed: {0}").format(str(e or "An Error occured !!").replace(self.client_secret, "****")))  # Show actual error
+            # Mask sensitive information in error messages
+            error_message = str(e or "An Error occurred !!")
+            if self.client_secret:
+                error_message = error_message.replace(self.client_secret, "****")
+            if self.client_id:
+                error_message = error_message.replace(self.client_id, "****")
+            
+            frappe.throw(_("Xero API request failed: {0}").format(error_message))
 
         finally:
             self._log_request()
@@ -95,7 +121,6 @@ class XeroBase:
         full_url = "/".join(filter(None, [base_url.rstrip("/"), base_path, endpoint]))
         
         return full_url
-
 
     def _prepare_log(self, url, params, json, headers):
         self.log_data = {
@@ -113,7 +138,7 @@ class XeroBase:
     def _mask_sensitive_info(self, data):
         if not isinstance(data, dict):
             return data
-        sensitive_fields = {"key", "password", "token", "auth", "secret"}
+        sensitive_fields = {"key", "password", "token", "auth", "secret", "authorization"}
         return {k: "****" if any(s in k.lower() for s in sensitive_fields) else v for k, v in data.items()}
     
     def _enqueue_log(self, log_data):
@@ -135,7 +160,7 @@ class XeroBase:
                 "timestamp": frappe.utils.now(),
                 # "reference_doctype": ref_doctype,
                 # "reference_docname": ref_docname,
-                "headers": str(self.headers),
+                "headers": str(self._mask_sensitive_info(self.headers)),
             })
             if self.enable_api_log:
                 log.insert(ignore_permissions=True)

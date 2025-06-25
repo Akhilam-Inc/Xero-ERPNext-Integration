@@ -3,13 +3,13 @@ from frappe import _
 from .base import XeroBase
 
 class XeroConnection(XeroBase):
-    BASE_PATH = "/contacts"
+    BASE_PATH = "/connections"
 
     def test_connection(self, connection):
         """Test Xero API connection using configuration"""
         try:
             # Make a simple GET request to list locations
-            response = self.get("", params={"key": self.api_key, "username": self.username})
+            response = self.get("")
 
             return {
                 "status": "success",
