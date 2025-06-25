@@ -18,7 +18,13 @@ frappe.ui.form.on('Xero Settings', {
         }
     },
 	before_save: function(frm) {
-		test_xero_connection(frm);
+		if(frm.doc.enable){
+			test_xero_connection(frm);
+		}
+		else{
+			frappe.show_alert("Please enable the integration to test the connection.");
+		}
+		
 	}
 });
 
@@ -34,6 +40,7 @@ function test_xero_connection(frm) {
                         indicator: 'green'
                     });
                 } else {
+					frm.set_value("enable", 0)
                     frappe.msgprint({
                         title: __('Connection Failed'),
                         message: r.message.message,
