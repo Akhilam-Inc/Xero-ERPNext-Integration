@@ -30,7 +30,7 @@ frappe.ui.form.on('Xero Settings', {
 
 function test_xero_connection(frm) {
     frappe.call({
-        method: 'xero_erpnext_integration.apis.connection.test_xero_connection',
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.test_xero_connection',
         callback: function(r) {
             if (r.message) {
                 if (r.message.status === 'success') {
@@ -54,7 +54,7 @@ function test_xero_connection(frm) {
 
 function get_organisation_info(frm) {
     frappe.call({
-        method: 'xero_erpnext_integration.apis.connection.get_organisation_details',
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_organisation_details',
         callback: function(r) {
             if (r.message && r.message.status === 'success') {
                 let org = r.message.data;
@@ -87,7 +87,7 @@ function sync_pending_invoices(frm) {
         'This will sync all pending invoices to Xero. Continue?',
         function() {
             frappe.call({
-                method: 'xero_erpnext_integration.apis.invoice_sync.sync_all_pending_invoices',
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.invoice_sync.sync_all_pending_invoices',
                 callback: function(r) {
                     if (r.message) {
                         frappe.msgprint({
