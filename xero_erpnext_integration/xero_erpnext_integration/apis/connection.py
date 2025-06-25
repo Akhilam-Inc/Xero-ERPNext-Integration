@@ -3,6 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_url
 import json
+from .base import get_xero_client
 
 class XeroSettings(Document):
     def validate(self):
@@ -86,7 +87,7 @@ def handle_oauth_callback(code, state=None):
 def test_xero_connection():
     """Test Xero API connection"""
     try:
-        settings = frappe.get_single("Xero Settings")
-        return settings.test_connection()
+        client = get_xero_client()
+        return client.test_connection()
     except Exception as e:
         return {"status": "error", "message": str(e)}
