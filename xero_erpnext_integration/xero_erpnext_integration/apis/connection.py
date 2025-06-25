@@ -1,5 +1,5 @@
 import frappe
-from .base3.xero_base_client import get_xero_client
+from .base3 import get_xero_client
 
 @frappe.whitelist()
 def test_xero_connection():
