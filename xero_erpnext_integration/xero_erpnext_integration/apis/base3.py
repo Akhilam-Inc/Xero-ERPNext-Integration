@@ -162,7 +162,19 @@ class XeroBaseClient:
         if not self.access_token or not self.token_expires_at:
             return True
         
-        return now_datetime() >= self.token_expires_at
+        # Convert token_expires_at to datetime if it's a string
+        if isinstance(self.token_expires_at, str):
+            from frappe.utils import get_datetime
+            try:
+                expires_at = get_datetime(self.token_expires_at)
+            except:
+                # If conversion fails, consider token expired
+                return True
+        else:
+            expires_at = self.token_expires_at
+        
+        return now_datetime() >= expires_at
+
     
     def _ensure_valid_token(self):
         """Ensure we have a valid access token"""
