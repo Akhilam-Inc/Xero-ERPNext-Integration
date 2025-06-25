@@ -47,7 +47,8 @@ class XeroBaseClient:
             
             data = {
                 "grant_type": "client_credentials",
-                "scope": "accounting.transactions accounting.contacts accounting.settings"
+                "scope": "app.connections"
+                # "accounting.transactions accounting.contacts accounting.settings"
             }
             
             # Log request if debug mode is enabled
