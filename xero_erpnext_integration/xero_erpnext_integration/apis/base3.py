@@ -30,7 +30,7 @@ class XeroBaseClient:
             frappe.throw("Client ID and Client Secret are required")
         
         # Create credentials string
-        credentials = f"{self.settings.client_id}:{self.settings.client_secret}"
+        credentials = f"{self.settings.client_id}:{self.settings.get_password('client_secret')}"
         
         # Encode to base64
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
