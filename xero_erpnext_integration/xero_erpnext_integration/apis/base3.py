@@ -311,12 +311,12 @@ class XeroBaseClient:
         try:
             frappe.get_doc({
                 "doctype": "Xero API Log",
-                "api_endpoint": endpoint,
-                "request_method": method,
-                "request_payload": json.dumps(request_payload) if request_payload else None,
-                "response_body": json.dumps(response_body) if response_body else None,
+                "api_url": endpoint,
+                "api_method": method,
+                "payload": json.dumps(request_payload) if request_payload else None,
+                "response": json.dumps(response_body) if response_body else None,
                 "status_code": status_code,
-                "error_message": error_message,
+                "message": error_message,
                 "timestamp": now_datetime()
             }).insert(ignore_permissions=True)
         except Exception as e:
