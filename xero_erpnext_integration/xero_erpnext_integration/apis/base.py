@@ -26,10 +26,21 @@ class XeroBase:
         self.enable_api_log = self.config.debug_mode
         self.client_id = self.config.ccid
         
-        # Initialize headers - will be updated with bearer token
+        # Get Xero-specific headers
+        self.xero_tenant_id = getattr(self.config, 'xero_tenant_id', None)
+        self.xero_user_id = getattr(self.config, 'xero_user_id', None)
+        
+        # Initialize headers - will be updated with bearer token and Xero headers
         self.headers = {
             "Content-Type": "application/json"
         }
+        
+        # Add Xero-specific headers if available
+        if self.xero_tenant_id:
+            self.headers["Xero-Tenant-Id"] = self.xero_tenant_id
+        if self.xero_user_id:
+            self.headers["Xero-User-Id"] = self.xero_user_id
+            
         self.log_data = {}
         
         if self.enabled:
@@ -48,6 +59,10 @@ class XeroBase:
             
         if not self.access_token_url:
             frappe.throw(_("Please set <strong>Xero</strong> Access Token URL."), title=_("Access Token URL Is Missing"))
+            
+        # Check for required Xero headers
+        if not self.xero_tenant_id:
+            frappe.throw(_("Please set <strong>Xero Tenant ID</strong> in Xero Settings."), title=_("Xero Tenant ID Is Missing"))
 
     def _create_basic_auth_header(self):
         """Create Basic Authentication header for access token request"""
@@ -80,7 +95,7 @@ class XeroBase:
             # Prepare data for token request (OAuth 2.0 client credentials flow)
             token_data = {
                 "grant_type": "client_credentials",
-                "scope": "app.connections"  # Adjust scopes as needed
+                "scope": "accounting.transactions accounting.contacts accounting.settings"  # Adjust scopes as needed
             }
             
             # Make request to get access token
@@ -178,6 +193,42 @@ class XeroBase:
             # If anything goes wrong, try to get a fresh token
             self._set_bearer_token()
 
+    def get_tenants(self):
+        """Get list of tenants/organizations for the authenticated user"""
+        try:
+            # Use connections endpoint to get tenant information
+            connections_url = "https://api.xero.com/connections"
+            
+            # Headers for connections request (no tenant ID needed for this call)
+            headers = {
+                "Authorization": f"Bearer {self._get_access_token()}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.get(connections_url, headers=headers)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                frappe.log_error(f"Failed to get tenants: {response.text}", "Xero Tenants")
+                return []
+                
+        except Exception as e:
+            frappe.log_error(f"Error getting Xero tenants: {str(e)}", "Xero Tenants")
+            return []
+
+    def set_tenant_id(self, tenant_id):
+        """Set the Xero Tenant ID for API requests"""
+        self.xero_tenant_id = tenant_id
+        self.headers["Xero-Tenant-Id"] = tenant_id
+        
+        # Update the config if needed
+        try:
+            self.config.xero_tenant_id = tenant_id
+            self.config.save()
+        except Exception as e:
+            frappe.log_error(f"Failed to save tenant ID: {str(e)}", "Xero Config")
+
     def get(self, endpoint=None, params=None, headers=None):
         return self._make_request(SupportedHTTPMethod.GET, endpoint=endpoint, params=params, headers=headers)
     
@@ -197,6 +248,10 @@ class XeroBase:
         
         url = self._build_url(endpoint, method)
         request_headers = {**self.headers, **(headers or {})}
+        
+        # Ensure required Xero headers are present
+        if not request_headers.get("Xero-Tenant-Id"):
+            frappe.throw(_("Xero-Tenant-Id header is required for API requests. Please configure it in Xero Settings."))
 
         # Remove API key from params since we're using Bearer token
         params = params or {}
@@ -228,7 +283,11 @@ class XeroBase:
             )
             
             if response.status_code >= 400:
-                frappe.throw(_("Xero API request failed with status {0}: {1}").format(response.status_code, response.text))
+                # Provide more specific error message for common Xero errors
+                if response.status_code == 400 and "Xero-Tenant-Id" in response.text:
+                    frappe.throw(_("Xero API request failed: Missing or invalid Xero-Tenant-Id. Please check your Xero Settings configuration."))
+                else:
+                    frappe.throw(_("Xero API request failed with status {0}: {1}").format(response.status_code, response.text))
             
             return response_json
             
@@ -309,3 +368,53 @@ class XeroBase:
         except Exception as e:
             frappe.log_error(message=str(e), title="Xero Log")
             return None
+
+    def test_connection(self):
+        """Test the Xero API connection"""
+        try:
+            # First, try to get tenants to verify OAuth setup
+            tenants = self.get_tenants()
+            
+            if not tenants:
+                return {
+                    "status": "error",
+                    "message": "No tenants found. Please check your OAuth configuration."
+                }
+            
+            # If no tenant is configured, show available tenants
+            if not self.xero_tenant_id:
+                tenant_list = []
+                for tenant in tenants:
+                    tenant_list.append({
+                        "id": tenant.get("tenantId"),
+                        "name": tenant.get("tenantName"),
+                        "type": tenant.get("tenantType")
+                    })
+                
+                return {
+                    "status": "warning",
+                    "message": "Please select a tenant from the available options",
+                    "tenants": tenant_list
+                }
+            
+            # Test a simple API call (e.g., get organisation info)
+            response = self.get("Organisation")
+            
+            if response:
+                return {
+                    "status": "success",
+                    "message": "Connection successful",
+                    "data": response
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "Failed to connect to Xero API"
+                }
+                
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Connection test failed: {str(e)}"
+            }
+

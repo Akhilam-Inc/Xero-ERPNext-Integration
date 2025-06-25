@@ -8,7 +8,7 @@ frappe.ui.form.on("Xero Settings", {
     before_save: function(frm) {
 		if (frm.doc.enable) {
 			frappe.call({
-				method: "xero_erpnext_integration.xero_erpnext_integration.apis.connection.test_xero_connection",
+				method: "xero_erpnext_integration.xero_erpnext_integration.apis.connection.test_connection",
 				freeze: true,
 				callback: function(r) {
 					if (r.message.status === "success") {

@@ -1,36 +1,17 @@
 import frappe
 from frappe import _
-from .base import XeroBase
-
-class XeroConnection(XeroBase):
-    BASE_PATH = "/connections"
-
-    def test_connection(self, connection):
-        """Test Xero API connection using configuration"""
-        try:
-            # Make a simple GET request to list locations
-            response = self.get("")
-
-            return {
-                "status": "success",
-                "message": "Connection test successful",
-                "response": response
-            }
-
-        except Exception as e:
-            error_message = str(e)
-
-            return {
-                "status": "failed",
-                "message": str(e),
-                "error_message": error_message
-            }
-
+from .base2 import XeroAPIClient
 
 @frappe.whitelist()
-def test_xero_connection():
-    """Helper function to test Xero connection"""
-    connection = XeroConnection()
-    return connection.test_connection(connection)
-
-           
+def test_connection():
+    """
+    Test the connection to Xero API.
+    Returns a success message if the connection is successful.
+    """
+    try:
+        client = XeroAPIClient()
+        client.test_connection()  # Attempt to fetch contacts to verify connection
+        return {"message": _("Connection to Xero API is successful.")}
+    except Exception as e:
+        frappe.log_error(f"Xero API Connection Error: {str(e)}", "Xero Connection Error")
+        return {"error": _("Failed to connect to Xero API. Please check your settings and try again.")}

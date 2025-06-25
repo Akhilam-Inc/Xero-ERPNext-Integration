@@ -1,0 +1,364 @@
+import frappe
+from frappe import _
+from frappe.utils import now, flt, getdate, nowdate
+import json
+import hmac
+import hashlib
+import base64
+from .base2 import get_xero_client
+
+class XeroWebhookHandler:
+    """
+    Handle incoming webhooks from Xero
+    Process payment updates and sync back to ERPNext
+    """
+    
+    def __init__(self):
+        self.xero_client = get_xero_client()
+        self.settings = frappe.get_single("Xero Settings")
+    
+    def process_webhook(self, payload, signature=None):
+        """
+        Process incoming webhook from Xero
+        """
+        try:
+            # Verify webhook signature if webhook secret is configured
+            if self.settings.webhook_secret and signature:
+                if not self._verify_signature(payload, signature):
+                    frappe.throw(_("Invalid webhook signature"), frappe.AuthenticationError)
+            
+            # Parse webhook payload
+            webhook_data = json.loads(payload) if isinstance(payload, str) else payload
+            
+            # Log webhook received
+            self._log_webhook("Received", webhook_data)
+            
+            # Process each event in the webhook
+            results = []
+            for event in webhook_data.get("events", []):
+                try:
+                    result = self._process_event(event)
+                    results.append(result)
+                except Exception as e:
+                    error_msg = f"Failed to process event {event.get('eventId', 'unknown')}: {str(e)}"
+                    frappe.log_error(error_msg, "Xero Webhook Event Error")
+                    results.append({"status": "error", "message": error_msg})
+            
+            return {"status": "success", "processed_events": len(results), "results": results}
+            
+        except Exception as e:
+            error_msg = f"Webhook processing failed: {str(e)}"
+            frappe.log_error(error_msg, "Xero Webhook Error")
+            self._log_webhook("Error", {"error": error_msg})
+            return {"status": "error", "message": error_msg}
+    
+    def _verify_signature(self, payload, signature):
+        """Verify webhook signature using HMAC-SHA256"""
+        try:
+            webhook_secret = self.settings.get_password("webhook_secret")
+            if not webhook_secret:
+                return True  # Skip verification if no secret configured
+            
+            # Calculate expected signature
+            expected_signature = base64.b64encode(
+                hmac.new(
+                    webhook_secret.encode('utf-8'),
+                    payload.encode('utf-8') if isinstance(payload, str) else payload,
+                    hashlib.sha256
+                ).digest()
+            ).decode('utf-8')
+            
+            # Compare signatures
+            return hmac.compare_digest(signature, expected_signature)
+            
+        except Exception as e:
+            frappe.log_error(f"Signature verification failed: {str(e)}", "Xero Webhook Signature")
+            return False
+    
+    def _process_event(self, event):
+        """Process individual webhook event"""
+        event_category = event.get("eventCategory")
+        event_type = event.get("eventType")
+        resource_url = event.get("resourceUrl")
+        resource_id = event.get("resourceId")
+        
+        # Log event processing
+        frappe.logger().info(f"Processing Xero webhook event: {event_category}.{event_type} for resource {resource_id}")
+        
+        # Handle different event types
+        if event_category == "INVOICE" and event_type == "UPDATE":
+            return self._handle_invoice_update(resource_url, resource_id)
+        elif event_category == "PAYMENT" and event_type == "CREATE":
+            return self._handle_payment_create(resource_url, resource_id)
+        elif event_category == "PAYMENT" and event_type == "UPDATE":
+            return self._handle_payment_update(resource_url, resource_id)
+        else:
+            return {"status": "ignored", "message": f"Event type {event_category}.{event_type} not handled"}
+    
+    def _handle_invoice_update(self, resource_url, resource_id):
+        """Handle invoice update events"""
+        try:
+            # Get invoice details from Xero
+            xero_invoice = self.xero_client.get_invoice(resource_id)
+            
+            if not xero_invoice:
+                return {"status": "error", "message": "Invoice not found in Xero"}
+            
+            # Find corresponding ERPNext Sales Invoice
+            sales_invoice = self._find_erpnext_invoice(xero_invoice.invoice_number, resource_id)
+            
+            if not sales_invoice:
+                return {"status": "ignored", "message": "Corresponding ERPNext invoice not found"}
+            
+            # Check if invoice status changed to paid
+            if xero_invoice.status == "PAID" and sales_invoice.status != "Paid":
+                return self._create_payment_entry(sales_invoice, xero_invoice)
+            
+            return {"status": "success", "message": "Invoice status updated"}
+            
+        except Exception as e:
+            error_msg = f"Failed to handle invoice update: {str(e)}"
+            frappe.log_error(error_msg, "Xero Invoice Update Handler")
+            return {"status": "error", "message": error_msg}
+    
+    def _handle_payment_create(self, resource_url, resource_id):
+        """Handle payment creation events"""
+        try:
+            # Get payment details from Xero
+            payments = self.xero_client.get_payments()
+            xero_payment = None
+            
+            for payment in payments:
+                if payment.payment_id == resource_id:
+                    xero_payment = payment
+                    break
+            
+            if not xero_payment:
+                return {"status": "error", "message": "Payment not found in Xero"}
+            
+            # Process payment for each invoice
+            results = []
+            if hasattr(xero_payment, 'invoice') and xero_payment.invoice:
+                invoice_id = xero_payment.invoice.invoice_id
+                
+                # Get invoice details
+                xero_invoice = self.xero_client.get_invoice(invoice_id)
+                if xero_invoice:
+                    sales_invoice = self._find_erpnext_invoice(xero_invoice.invoice_number, invoice_id)
+                    if sales_invoice:
+                        result = self._create_payment_entry_from_payment(sales_invoice, xero_payment)
+                        results.append(result)
+            
+            return {"status": "success", "results": results}
+            
+        except Exception as e:
+            error_msg = f"Failed to handle payment creation: {str(e)}"
+            frappe.log_error(error_msg, "Xero Payment Create Handler")
+            return {"status": "error", "message": error_msg}
+    
+    def _handle_payment_update(self, resource_url, resource_id):
+        """Handle payment update events"""
+        # Similar to payment create but for updates
+        return self._handle_payment_create(resource_url, resource_id)
+    
+    def _find_erpnext_invoice(self, invoice_number, xero_invoice_id):
+        """Find ERPNext Sales Invoice by invoice number or Xero ID"""
+        try:
+            # First try to find by Xero invoice ID
+            invoices = frappe.get_all("Sales Invoice", 
+                                    filters={"custom_xero_invoice_id": xero_invoice_id},
+                                    fields=["name"])
+            
+            if invoices:
+                return frappe.get_doc("Sales Invoice", invoices[0].name)
+            
+            # Then try to find by invoice number
+            invoices = frappe.get_all("Sales Invoice", 
+                                    filters={"name": invoice_number},
+                                    fields=["name"])
+            
+            if invoices:
+                return frappe.get_doc("Sales Invoice", invoices[0].name)
+            
+            return None
+            
+        except Exception as e:
+            frappe.log_error(f"Error finding ERPNext invoice: {str(e)}", "Xero Invoice Lookup")
+            return None
+    
+    def _create_payment_entry(self, sales_invoice, xero_invoice):
+        """Create Payment Entry in ERPNext based on Xero invoice payment"""
+        try:
+            # Check if payment entry already exists
+            existing_payments = frappe.get_all("Payment Entry", 
+                                             filters={
+                                                 "reference_doctype": "Sales Invoice",
+                                                 "reference_name": sales_invoice.name,
+                                                 "custom_xero_payment_id": ["!=", ""]
+                                             })
+            
+            if existing_payments:
+                return {"status": "ignored", "message": "Payment entry already exists"}
+            
+            # Get payment details from Xero
+            payments = self.xero_client.get_payments(invoice_id=xero_invoice.invoice_id)
+            
+            if not payments:
+                return {"status": "error", "message": "No payments found for invoice"}
+            
+            # Create payment entry for each payment
+            results = []
+            for payment in payments:
+                result = self._create_payment_entry_from_payment(sales_invoice, payment)
+                results.append(result)
+            
+            return {"status": "success", "results": results}
+            
+        except Exception as e:
+            error_msg = f"Failed to create payment entry: {str(e)}"
+            frappe.log_error(error_msg, "Xero Payment Entry Creation")
+            return {"status": "error", "message": error_msg}
+    
+    def _create_payment_entry_from_payment(self, sales_invoice, xero_payment):
+        """Create Payment Entry from Xero payment object"""
+        try:
+            # Prepare payment entry data
+            payment_entry = frappe.new_doc("Payment Entry")
+            payment_entry.payment_type = "Receive"
+            payment_entry.party_type = "Customer"
+            payment_entry.party = sales_invoice.customer
+            payment_entry.paid_amount = flt(xero_payment.amount)
+            payment_entry.received_amount = flt(xero_payment.amount)
+            payment_entry.target_exchange_rate = 1
+            payment_entry.posting_date = getdate(xero_payment.date) if hasattr(xero_payment, 'date') else nowdate()
+            payment_entry.reference_no = xero_payment.reference if hasattr(xero_payment, 'reference') else ""
+            payment_entry.reference_date = payment_entry.posting_date
+            
+            # Set accounts
+            payment_entry.paid_to = self._get_default_receivable_account(sales_invoice.company)
+            payment_entry.paid_from = self._get_default_cash_account(sales_invoice.company)
+            
+            # Add reference to sales invoice
+            payment_entry.append("references", {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": sales_invoice.name,
+                "allocated_amount": flt(xero_payment.amount)
+            })
+            
+            # Add Xero payment details
+            payment_entry.custom_xero_payment_id = xero_payment.payment_id
+            payment_entry.custom_xero_sync_status = "Synced"
+            payment_entry.custom_xero_sync_date = nowdate()
+            
+            # Save and submit payment entry
+            payment_entry.insert(ignore_permissions=True)
+            payment_entry.submit()
+            
+            return {
+                "status": "success", 
+                "payment_entry": payment_entry.name,
+                "amount": flt(xero_payment.amount)
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to create payment entry from Xero payment: {str(e)}"
+            frappe.log_error(error_msg, "Xero Payment Entry Creation")
+            return {"status": "error", "message": error_msg}
+    
+    def _get_default_receivable_account(self, company):
+        """Get default receivable account for company"""
+        try:
+            company_doc = frappe.get_doc("Company", company)
+            return company_doc.default_receivable_account
+        except:
+            # Fallback to first receivable account
+            accounts = frappe.get_all("Account", 
+                                    filters={
+                                        "company": company,
+                                        "account_type": "Receivable",
+                                        "is_group": 0
+                                    },
+                                    limit=1)
+            return accounts[0].name if accounts else None
+    
+    def _get_default_cash_account(self, company):
+        """Get default cash account for company"""
+        try:
+            company_doc = frappe.get_doc("Company", company)
+            return company_doc.default_cash_account
+        except:
+            # Fallback to first cash account
+            accounts = frappe.get_all("Account", 
+                                    filters={
+                                        "company": company,
+                                        "account_type": "Cash",
+                                        "is_group": 0
+                                    },
+                                    limit=1)
+            return accounts[0].name if accounts else None
+    
+    def _log_webhook(self, status, data):
+        """Log webhook activity"""
+        try:
+            if not self.settings.debug_mode:
+                return
+                
+            log_doc = frappe.get_doc({
+                "doctype": "Xero API Log",
+                "api_method": "WEBHOOK",
+                "api_endpoint": "/webhook",
+                "status_code": 200 if status == "Received" else 500,
+                "message": f"Webhook {status}",
+                "request_payload": json.dumps(data, indent=2),
+                "timestamp": now(),
+                "tenant_id": self.settings.tenant_id
+            })
+            
+            log_doc.insert(ignore_permissions=True)
+            
+        except Exception as e:
+            frappe.log_error(f"Failed to log webhook: {str(e)}", "Xero Webhook Log Error")
+
+
+# API endpoint for webhook
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def handle_xero_webhook():
+    """
+    Public endpoint to handle Xero webhooks
+    URL: /api/method/xero_erpnext_integration.apis.webhook_handler.handle_xero_webhook
+    """
+    try:
+        # Get request data
+        payload = frappe.request.get_data()
+        signature = frappe.request.headers.get("X-Xero-Signature")
+        
+        # Process webhook
+        handler = XeroWebhookHandler()
+        result = handler.process_webhook(payload, signature)
+        
+        # Return response
+        frappe.response["message"] = result
+        frappe.response["http_status_code"] = 200 if result.get("status") == "success" else 400
+        
+        return result
+        
+    except Exception as e:
+        error_msg = f"Webhook endpoint error: {str(e)}"
+        frappe.log_error(error_msg, "Xero Webhook Endpoint")
+        
+        frappe.response["message"] = {"status": "error", "message": error_msg}
+        frappe.response["http_status_code"] = 500
+        
+        return {"status": "error", "message": error_msg}
+
+
+# Manual webhook processing for testing
+@frappe.whitelist()
+def test_webhook_processing(payload):
+    """Test webhook processing with sample payload"""
+    try:
+        handler = XeroWebhookHandler()
+        return handler.process_webhook(payload)
+        
+    except Exception as e:
+        frappe.log_error(f"Test webhook processing failed: {str(e)}", "Xero Test Webhook")
