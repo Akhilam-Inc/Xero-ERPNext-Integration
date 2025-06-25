@@ -129,10 +129,11 @@ class XeroAPIClient:
         """Get OAuth2 authorization URL"""
         try:
             scopes = [
-                "accounting.transactions",
-                "accounting.contacts", 
-                "accounting.settings",
-                "accounting.attachments"
+                # "accounting.transactions",
+                # "accounting.contacts", 
+                # "accounting.settings",
+                # "accounting.attachments",
+                "app.connections"
             ]
             
             auth_url = self.api_client.build_authorization_url(
