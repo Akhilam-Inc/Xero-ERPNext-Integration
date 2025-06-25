@@ -1,0 +1,358 @@
+import frappe
+import requests
+import base64
+import json
+from datetime import datetime, timedelta
+from frappe.utils import now_datetime, add_to_date
+
+class XeroBaseClient:
+    """Base client for Xero API requests with automatic token management"""
+    
+    def __init__(self):
+        self.base_url = "https://api.xero.com"
+        self.token_url = "https://identity.xero.com/connect/token"
+        self.connections_url = "https://api.xero.com/connections"
+        self.settings = self._get_xero_settings()
+        self.access_token = None
+        self.tenant_id = None
+        self.token_expires_at = None
+        
+    def _get_xero_settings(self):
+        """Get Xero settings from database"""
+        try:
+            return frappe.get_single("Xero Settings")
+        except:
+            frappe.throw("Xero Settings not found. Please configure Xero integration first.")
+    
+    def _get_basic_auth_header(self):
+        """Generate Basic Auth header using client_id and client_secret"""
+        if not self.settings.client_id or not self.settings.client_secret:
+            frappe.throw("Client ID and Client Secret are required")
+        
+        # Create credentials string
+        credentials = f"{self.settings.client_id}:{self.settings.client_secret}"
+        
+        # Encode to base64
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        
+        return f"Basic {encoded_credentials}"
+    
+    def _generate_access_token(self):
+        """Generate access token using client credentials flow"""
+        try:
+            headers = {
+                "Authorization": self._get_basic_auth_header(),
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            
+            data = {
+                "grant_type": "client_credentials",
+                "scope": "accounting.transactions accounting.contacts accounting.settings"
+            }
+            
+            # Log request if debug mode is enabled
+            if self.settings.debug_mode:
+                self._log_api_call(
+                    endpoint="/connect/token",
+                    method="POST",
+                    request_payload=data
+                )
+            
+            response = requests.post(
+                self.token_url,
+                headers=headers,
+                data=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                
+                self.access_token = token_data.get("access_token")
+                expires_in = token_data.get("expires_in", 1800)  # Default 30 minutes
+                
+                # Calculate expiry time (subtract 5 minutes for safety)
+                self.token_expires_at = add_to_date(
+                    now_datetime(), 
+                    seconds=expires_in - 300
+                )
+                
+                # Update settings with new token info
+                self.settings.access_token = self.access_token
+                self.settings.token_expires_at = self.token_expires_at
+                self.settings.save(ignore_permissions=True)
+                
+                # Get tenant ID if not already set
+                if not self.settings.tenant_id:
+                    self._get_tenant_id()
+                
+                # Log successful response
+                if self.settings.debug_mode:
+                    self._log_api_call(
+                        endpoint="/connect/token",
+                        method="POST",
+                        response_body={"access_token": "***", "expires_in": expires_in},
+                        status_code=200
+                    )
+                
+                frappe.logger().info("Xero access token generated successfully")
+                return True
+                
+            else:
+                error_msg = f"Failed to generate access token: {response.status_code} - {response.text}"
+                
+                # Log error
+                if self.settings.debug_mode:
+                    self._log_api_call(
+                        endpoint="/connect/token",
+                        method="POST",
+                        response_body=response.text,
+                        status_code=response.status_code,
+                        error_message=error_msg
+                    )
+                
+                frappe.logger().error(error_msg)
+                frappe.throw(error_msg)
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network error while generating access token: {str(e)}"
+            frappe.logger().error(error_msg)
+            frappe.throw(error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error while generating access token: {str(e)}"
+            frappe.logger().error(error_msg)
+            frappe.throw(error_msg)
+    
+    def _get_tenant_id(self):
+        """Get tenant ID from Xero connections"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.get(
+                self.connections_url,
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                connections = response.json()
+                if connections and len(connections) > 0:
+                    self.tenant_id = connections[0].get("tenantId")
+                    
+                    # Update settings
+                    self.settings.tenant_id = self.tenant_id
+                    self.settings.save(ignore_permissions=True)
+                    
+                    frappe.logger().info(f"Tenant ID retrieved: {self.tenant_id}")
+                else:
+                    frappe.throw("No Xero connections found")
+            else:
+                frappe.throw(f"Failed to get tenant ID: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            frappe.logger().error(f"Error getting tenant ID: {str(e)}")
+            # Don't throw here as tenant ID might be manually set
+    
+    def _is_token_expired(self):
+        """Check if access token is expired"""
+        if not self.access_token or not self.token_expires_at:
+            return True
+        
+        return now_datetime() >= self.token_expires_at
+    
+    def _ensure_valid_token(self):
+        """Ensure we have a valid access token"""
+        # Load existing token from settings
+        if self.settings.access_token and self.settings.token_expires_at:
+            self.access_token = self.settings.access_token
+            self.token_expires_at = self.settings.token_expires_at
+        
+        # Check if token is expired or missing
+        if self._is_token_expired():
+            frappe.logger().info("Access token expired or missing, generating new token")
+            self._generate_access_token()
+        
+        # Set tenant ID
+        if self.settings.tenant_id:
+            self.tenant_id = self.settings.tenant_id
+    
+    def make_request(self, method, endpoint, data=None, params=None):
+        """
+        Make authenticated request to Xero API
+        
+        Args:
+            method (str): HTTP method (GET, POST, PUT, DELETE)
+            endpoint (str): API endpoint (e.g., '/Invoices')
+            data (dict): Request payload for POST/PUT requests
+            params (dict): Query parameters
+            
+        Returns:
+            dict: Response data
+        """
+        # Ensure we have a valid token
+        self._ensure_valid_token()
+        
+        if not self.tenant_id:
+            frappe.throw("Tenant ID not found. Please check Xero connection.")
+        
+        # Prepare request
+        url = f"{self.base_url}{endpoint}"
+        
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Xero-tenant-id": self.tenant_id,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        try:
+            # Log request if debug mode is enabled
+            if self.settings.debug_mode:
+                self._log_api_call(
+                    endpoint=endpoint,
+                    method=method,
+                    request_payload=data or params
+                )
+            
+            # Make request
+            if method.upper() == "GET":
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+            elif method.upper() == "POST":
+                response = requests.post(url, headers=headers, json=data, timeout=30)
+            elif method.upper() == "PUT":
+                response = requests.put(url, headers=headers, json=data, timeout=30)
+            elif method.upper() == "DELETE":
+                response = requests.delete(url, headers=headers, timeout=30)
+            else:
+                frappe.throw(f"Unsupported HTTP method: {method}")
+            
+            # Handle response
+            if response.status_code in [200, 201]:
+                response_data = response.json() if response.content else {}
+                
+                # Log successful response
+                if self.settings.debug_mode:
+                    self._log_api_call(
+                        endpoint=endpoint,
+                        method=method,
+                        response_body=response_data,
+                        status_code=response.status_code
+                    )
+                
+                return response_data
+                
+            elif response.status_code == 401:
+                # Token might be expired, try to regenerate once
+                frappe.logger().warning("Received 401, attempting to regenerate token")
+                self._generate_access_token()
+                
+                # Retry the request once with new token
+                headers["Authorization"] = f"Bearer {self.access_token}"
+                
+                if method.upper() == "GET":
+                    response = requests.get(url, headers=headers, params=params, timeout=30)
+                elif method.upper() == "POST":
+                    response = requests.post(url, headers=headers, json=data, timeout=30)
+                elif method.upper() == "PUT":
+                    response = requests.put(url, headers=headers, json=data, timeout=30)
+                elif method.upper() == "DELETE":
+                    response = requests.delete(url, headers=headers, timeout=30)
+                
+                if response.status_code in [200, 201]:
+                    response_data = response.json() if response.content else {}
+                    
+                    if self.settings.debug_mode:
+                        self._log_api_call(
+                            endpoint=endpoint,
+                            method=method,
+                            response_body=response_data,
+                            status_code=response.status_code
+                        )
+                    
+                    return response_data
+                else:
+                    error_msg = f"Request failed after token refresh: {response.status_code} - {response.text}"
+                    self._handle_error(endpoint, method, response, error_msg)
+            else:
+                error_msg = f"Request failed: {response.status_code} - {response.text}"
+                self._handle_error(endpoint, method, response, error_msg)
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network error: {str(e)}"
+            self._handle_error(endpoint, method, None, error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            self._handle_error(endpoint, method, None, error_msg)
+    
+    def _handle_error(self, endpoint, method, response, error_msg):
+        """Handle API errors"""
+        status_code = response.status_code if response else 500
+        response_text = response.text if response else ""
+        
+        # Log error
+        if self.settings.debug_mode:
+            self._log_api_call(
+                endpoint=endpoint,
+                method=method,
+                response_body=response_text,
+                status_code=status_code,
+                error_message=error_msg
+            )
+        
+        frappe.logger().error(f"Xero API Error: {error_msg}")
+        frappe.throw(error_msg)
+    
+    def _log_api_call(self, endpoint, method, request_payload=None, response_body=None, status_code=None, error_message=None):
+        """Log API call for debugging"""
+        try:
+            frappe.get_doc({
+                "doctype": "Xero API Log",
+                "api_endpoint": endpoint,
+                "request_method": method,
+                "request_payload": json.dumps(request_payload) if request_payload else None,
+                "response_body": json.dumps(response_body) if response_body else None,
+                "status_code": status_code,
+                "error_message": error_message,
+                "timestamp": now_datetime()
+            }).insert(ignore_permissions=True)
+        except Exception as e:
+            frappe.logger().error(f"Failed to log API call: {str(e)}")
+    
+    def test_connection(self):
+        """Test the Xero API connection"""
+        try:
+            response = self.make_request("GET", "/Organisation")
+            
+            if response and response.get("Organisations"):
+                org = response["Organisations"][0]
+                return {
+                    "status": "success",
+                    "message": f"Successfully connected to {org.get('Name', 'Unknown')}",
+                    "organisation": org.get("Name"),
+                    "country": org.get("CountryCode"),
+                    "currency": org.get("BaseCurrency")
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "No organisation data received"
+                }
+                
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
+# Singleton instance
+_xero_client = None
+
+def get_xero_client():
+    """Get singleton Xero client instance"""
+    global _xero_client
+    if _xero_client is None:
+        _xero_client = XeroBaseClient()
+    return _xero_client

@@ -1,41 +1,96 @@
-// Copyright (c) 2025, nasirucode and contributors
-// For license information, please see license.txt
-
-frappe.ui.form.on("Xero Settings", {
-	refresh(frm) {
-
-	},
-    before_save: function(frm) {
-		if (frm.doc.enable) {
-			frappe.call({
-				method: "xero_erpnext_integration.xero_erpnext_integration.apis.connection.test_xero_connection",
-				freeze: true,
-				callback: function(r) {
-					if (r.message.status === "success") {
-						frappe.show_alert({
-							title: __('Success'),
-							indicator: 'green',
-							message: __('xero connection is successfully authorized')
-						}, 10);
-                        // frm.save()
-					} else {
-						frm.set_value('enable', 0);
-						frappe.show_alert({
-							title: __('Connection Failed'),
-							indicator: 'red',
-							message: __(r.message.message || 'Invalid API Credentials')
-						}, 10);
-					}
-				},
-				error: function(r) {
-					frm.set_value('enable', 0);
-					frappe.show_alert({
-						title: __('Error'),
-						indicator: 'red',
-						message: __('xero API Connection Failed. Please check your credentials.')
-					}, 10);
-				}
-			});
-		}
-	},
+frappe.ui.form.on('Xero Settings', {
+    refresh: function(frm) {
+        // Add custom buttons
+        
+        frm.add_custom_button(__('Get Organisation Info'), function() {
+            get_organisation_info(frm);
+        });
+        
+        frm.add_custom_button(__('Sync Pending Invoices'), function() {
+            sync_pending_invoices(frm);
+        });
+        
+        // Show connection status
+        if (frm.doc.access_token && frm.doc.tenant_id) {
+            frm.dashboard.add_indicator(__('Connected'), 'green');
+        } else {
+            frm.dashboard.add_indicator(__('Not Connected'), 'red');
+        }
+    },
+	before_save: function(frm) {
+		test_xero_connection(frm);
+	}
 });
+
+function test_xero_connection(frm) {
+    frappe.call({
+        method: 'xero_erpnext_integration.apis.connection.test_xero_connection',
+        callback: function(r) {
+            if (r.message) {
+                if (r.message.status === 'success') {
+                    frappe.msgprint({
+                        title: __('Connection Successful'),
+                        message: r.message.message,
+                        indicator: 'green'
+                    });
+                } else {
+                    frappe.msgprint({
+                        title: __('Connection Failed'),
+                        message: r.message.message,
+                        indicator: 'red'
+                    });
+                }
+            }
+        }
+    });
+}
+
+function get_organisation_info(frm) {
+    frappe.call({
+        method: 'xero_erpnext_integration.apis.connection.get_organisation_details',
+        callback: function(r) {
+            if (r.message && r.message.status === 'success') {
+                let org = r.message.data;
+                let msg = `
+                    <b>Organisation:</b> ${org.Name}<br>
+                    <b>Country:</b> ${org.CountryCode}<br>
+                    <b>Currency:</b> ${org.BaseCurrency}<br>
+                    <b>Financial Year End:</b> ${org.FinancialYearEndDay}/${org.FinancialYearEndMonth}<br>
+                    <b>Tax Number:</b> ${org.TaxNumber || 'Not set'}
+                `;
+                
+                frappe.msgprint({
+                    title: __('Organisation Information'),
+                    message: msg,
+                    indicator: 'blue'
+                });
+            } else {
+                frappe.msgprint({
+                    title: __('Error'),
+                    message: r.message ? r.message.message : 'Failed to get organisation info',
+                    indicator: 'red'
+                });
+            }
+        }
+    });
+}
+
+function sync_pending_invoices(frm) {
+    frappe.confirm(
+        'This will sync all pending invoices to Xero. Continue?',
+        function() {
+            frappe.call({
+                method: 'xero_erpnext_integration.apis.invoice_sync.sync_all_pending_invoices',
+                callback: function(r) {
+                    if (r.message) {
+                        frappe.msgprint({
+                            title: __('Sync Result'),
+                            message: r.message.message,
+                            indicator: r.message.status === 'success' ? 'green' : 'orange'
+                        });
+                    }
+                }
+            });
+        }
+    );
+}
