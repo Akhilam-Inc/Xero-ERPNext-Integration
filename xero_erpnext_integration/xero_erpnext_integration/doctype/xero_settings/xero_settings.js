@@ -11,7 +11,7 @@ frappe.ui.form.on('Xero Settings', {
         });
         
         // Show connection status
-        if (frm.doc.access_token && frm.doc.tenant_id) {
+        if (frm.doc.access_token) {
             frm.dashboard.add_indicator(__('Connected'), 'green');
         } else {
             frm.dashboard.add_indicator(__('Not Connected'), 'red');
