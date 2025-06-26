@@ -126,8 +126,8 @@ class XeroBaseClient:
                     frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
 
                 # Get tenant ID if not already set
-                if not settings_data.get('tenant_id'):
-                    self._get_tenant_id(self.access_token)
+                # if not settings_data.get('tenant_id'):
+                #     self._get_tenant_id(self.access_token)
                 
                 # Log successful response
                 if settings_data.get('debug_mode'):
