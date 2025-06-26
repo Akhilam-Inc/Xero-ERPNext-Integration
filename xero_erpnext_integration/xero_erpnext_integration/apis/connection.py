@@ -1,13 +1,24 @@
 import frappe
-from .base3 import get_xero_client
+from .base4 import get_xero_client
+import json
 
 @frappe.whitelist()
 def test_xero_connection():
     """Test Xero API connection"""
     try:
         client = get_xero_client()
-        result = client.test_connection()
-        return result
+        response = client.make_request("GET", "/Invoices")
+        
+        if response:
+            return {
+                "status": "success",
+                "data": response
+            }
+        else:
+            return {
+                "status": "error", 
+                "message": "No organisation data found"
+            }
         
     except Exception as e:
         frappe.logger().error(f"Connection test failed: {str(e)}")
