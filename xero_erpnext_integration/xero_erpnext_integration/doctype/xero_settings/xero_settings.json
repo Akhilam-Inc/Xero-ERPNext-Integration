@@ -59,7 +59,7 @@
   },
   {
    "fieldname": "access_token",
-   "fieldtype": "Password",
+   "fieldtype": "Data",
    "label": "Access Token"
   },
   {
@@ -113,7 +113,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-25 12:08:43.744502",
+ "modified": "2025-06-25 15:04:41.791547",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",
