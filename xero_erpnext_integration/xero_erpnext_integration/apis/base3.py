@@ -49,11 +49,11 @@ class XeroBaseClient:
             # Commit the changes
             frappe.db.commit()
             
-            frappe.logger().info(f"Updated Xero Settings fields: {list(field_dict.keys())}")
+            frappe.log_error("success:",f"Updated Xero Settings fields: {list(field_dict.keys())}")
             return True
             
         except Exception as e:
-            frappe.logger().error(f"Error updating Xero Settings directly: {str(e)}")
+            frappe.log_error("error:",f"Error updating Xero Settings directly: {str(e)}")
             frappe.db.rollback()
             return False
     
@@ -123,11 +123,11 @@ class XeroBaseClient:
                 })
                 
                 if not update_success:
-                    frappe.logger().warning("Failed to save token to database, but token is valid in memory")
-                
+                    frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
+
                 # Get tenant ID if not already set
-                if not settings_data.get('tenant_id'):
-                    self._get_tenant_id()
+                # if not settings_data.get('tenant_id'):
+                #     self._get_tenant_id()
                 
                 # Log successful response
                 if settings_data.get('debug_mode'):
@@ -138,7 +138,7 @@ class XeroBaseClient:
                         status_code=200
                     )
                 
-                frappe.logger().info("Xero access token generated successfully")
+                frappe.log_error("success:","Xero access token generated successfully")
                 return True
                 
             else:
@@ -154,16 +154,16 @@ class XeroBaseClient:
                         error_message=error_msg
                     )
                 
-                frappe.logger().error(error_msg)
+                frappe.log_error("error:",error_msg)
                 frappe.throw(error_msg)
                 
         except requests.exceptions.RequestException as e:
             error_msg = f"Network error while generating access token: {str(e)}"
-            frappe.logger().error(error_msg)
+            frappe.log_error("error:",error_msg)
             frappe.throw(error_msg)
         except Exception as e:
             error_msg = f"Unexpected error while generating access token: {str(e)}"
-            frappe.logger().error(error_msg)
+            frappe.log_error("error:",error_msg)
             frappe.throw(error_msg)
     
     def _get_tenant_id(self):
@@ -191,16 +191,16 @@ class XeroBaseClient:
                     })
                     
                     if not update_success:
-                        frappe.logger().warning("Failed to save tenant_id to database, but tenant_id is valid in memory")
-                    
-                    frappe.logger().info(f"Tenant ID retrieved: {self.tenant_id}")
+                        frappe.log_error("Tenant Error:", "Failed to save tenant_id to database, but tenant_id is valid in memory")
+
+                    frappe.log_error("Tenant Error:", f"Tenant ID retrieved: {self.tenant_id}")
                 else:
                     frappe.throw("No Xero connections found")
             else:
                 frappe.throw(f"Failed to get tenant ID: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            frappe.logger().error(f"Error getting tenant ID: {str(e)}")
+            frappe.log_error("Tenant Error:",f"Error getting tenant ID: {str(e)}")
             # Don't throw here as tenant ID might be manually set
     
     def _is_token_expired(self):
@@ -233,7 +233,7 @@ class XeroBaseClient:
         
         # Check if token is expired or missing
         if self._is_token_expired():
-            frappe.logger().info("Access token expired or missing, generating new token")
+            frappe.log_error("success:","Access token expired or missing, generating new token")
             self._generate_access_token()
         
         # Set tenant ID from database
@@ -310,7 +310,7 @@ class XeroBaseClient:
                 
             elif response.status_code == 401:
                 # Token might be expired, try to regenerate once
-                frappe.logger().warning("Received 401, attempting to regenerate token")
+                frappe.log_error("warning:","Received 401, attempting to regenerate token")
                 self._generate_access_token()
                 
                 # Retry the request once with new token
@@ -370,7 +370,7 @@ class XeroBaseClient:
                 error_message=error_msg
             )
         
-        frappe.logger().error(f"Xero API Error: {error_msg}")
+        frappe.log_error("error:",f"Xero API Error: {error_msg}")
         frappe.throw(error_msg)
     
     def _log_api_call(self, endpoint, method, request_payload=None, response_body=None, status_code=None, error_message=None):
@@ -387,7 +387,7 @@ class XeroBaseClient:
                 "timestamp": now_datetime()
             }).insert(ignore_permissions=True)
         except Exception as e:
-            frappe.logger().error(f"Failed to log API call: {str(e)}")
+            frappe.log_error("error:",f"Failed to log API call: {str(e)}")
     
     def test_connection(self):
         """Test the Xero API connection"""
