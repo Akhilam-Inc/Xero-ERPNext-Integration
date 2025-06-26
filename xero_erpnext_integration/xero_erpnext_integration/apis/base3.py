@@ -34,29 +34,36 @@ class XeroBaseClient:
             return settings_data
         except:
             frappe.throw("Xero Settings not found. Please configure Xero integration first.")
-    
     def _update_db_directly(self, field_dict):
         """Update database directly without document loading"""
         try:
-            # Update each field directly in database
+            # For Single DocType, update each field with proper SQL escaping
             for field, value in field_dict.items():
                 frappe.db.sql("""
-                    UPDATE `tabXero Settings` 
-                    SET `{field}` = %s, `modified` = %s 
-                    WHERE `name` = 'Xero Settings'
-                """.format(field=field), (value, now_datetime()))
+                    UPDATE `tabSingles` 
+                    SET `value` = %s 
+                    WHERE `doctype` = 'Xero Settings' AND `field` = %s
+                """, (value, field))
+            
+            # Update the modified timestamp in the main doctype table
+            # frappe.db.sql("""
+            #     UPDATE `tabXero Settings` 
+            #     SET `modified` = %s 
+            #     WHERE `name` = 'Xero Settings'
+            # """, (now_datetime(),))
             
             # Commit the changes
             frappe.db.commit()
             
-            frappe.log_error("success:",f"Updated Xero Settings fields: {list(field_dict.keys())}")
+            frappe.log_error("success:", f"Updated Xero Settings fields: {list(field_dict.keys())}")
             return True
             
         except Exception as e:
-            frappe.log_error("error:",f"Error updating Xero Settings directly: {str(e)}")
+            frappe.log_error("error:", f"Error updating Xero Settings directly: {str(e)}")
             frappe.db.rollback()
             return False
-    
+
+   
     def _get_basic_auth_header(self):
         """Generate Basic Auth header using client_id and client_secret"""
         # Get fresh settings from database
@@ -126,8 +133,8 @@ class XeroBaseClient:
                     frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
 
                 # Get tenant ID if not already set
-                # if not settings_data.get('tenant_id'):
-                #     self._get_tenant_id()
+                if not settings_data.get('tenant_id'):
+                    self._get_tenant_id()
                 
                 # Log successful response
                 if settings_data.get('debug_mode'):
