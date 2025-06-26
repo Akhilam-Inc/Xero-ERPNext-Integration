@@ -47,7 +47,7 @@ class XeroBaseClient:
             
             data = {
                 "grant_type": "client_credentials",
-                "scope": "app.connections"
+                "scope": "app.connections, accounting.transactions, accounting.contacts, accounting.settings"
                 # "accounting.transactions accounting.contacts accounting.settings"
             }
             
@@ -78,10 +78,17 @@ class XeroBaseClient:
                     seconds=expires_in - 300
                 )
                 
-                # Update settings with new token info
+                # Update settings with new token info - Atomic update approach
+                frappe.db.set_value("Xero Settings", "Xero Settings", {
+                    "access_token": self.access_token,
+                    "token_expires_at": self.token_expires_at
+                })
+                frappe.db.commit()
+                
+                # Update the in-memory object
                 self.settings.access_token = self.access_token
                 self.settings.token_expires_at = self.token_expires_at
-                self.settings.save(ignore_permissions=True)
+
                 
                 # Get tenant ID if not already set
                 if not self.settings.tenant_id:
@@ -143,10 +150,13 @@ class XeroBaseClient:
                 if connections and len(connections) > 0:
                     self.tenant_id = connections[0].get("tenantId")
                     
-                    # Update settings
-                    self.settings.tenant_id = self.tenant_id
-                    self.settings.save(ignore_permissions=True)
+                    # Update settings - Atomic update approach
+                    frappe.db.set_value("Xero Settings", "Xero Settings", "tenant_id", self.tenant_id)
+                    frappe.db.commit()
                     
+                    # Update the in-memory object
+                    self.settings.tenant_id = self.tenant_id
+
                     frappe.logger().info(f"Tenant ID retrieved: {self.tenant_id}")
                 else:
                     frappe.throw("No Xero connections found")
