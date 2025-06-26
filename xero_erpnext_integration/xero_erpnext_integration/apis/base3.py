@@ -9,7 +9,7 @@ class XeroBaseClient:
     """Base client for Xero API requests with automatic token management"""
     
     def __init__(self):
-        self.base_url = "https://api.xero.com"
+        self.base_url = "https://api.xero.com/api.xro/2.0"
         self.token_url = "https://identity.xero.com/connect/token"
         self.connections_url = "https://api.xero.com/connections"
         self.settings = self._get_xero_settings()
@@ -261,7 +261,7 @@ class XeroBaseClient:
         
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "Xero-tenant-id": self.access_token,
+            # "Xero-tenant-id": self.access_token,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
@@ -389,16 +389,16 @@ class XeroBaseClient:
     def test_connection(self):
         """Test the Xero API connection"""
         try:
-            response = self.make_request("GET", "/Organisation")
+            response = self.make_request("GET", "/Invoices")
             
-            if response and response.get("Organisations"):
-                org = response["Organisations"][0]
+            if response:
+                # org = response["Organisations"][0]
                 return {
                     "status": "success",
-                    "message": f"Successfully connected to {org.get('Name', 'Unknown')}",
-                    "organisation": org.get("Name"),
-                    "country": org.get("CountryCode"),
-                    "currency": org.get("BaseCurrency")
+                    "message": f"Successfully connected to Xero",
+                    # "organisation": org.get("Name"),
+                    # "country": org.get("CountryCode"),
+                    # "currency": org.get("BaseCurrency")
                 }
             else:
                 return {
