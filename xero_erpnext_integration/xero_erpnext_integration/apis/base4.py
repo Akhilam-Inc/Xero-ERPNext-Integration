@@ -2,19 +2,15 @@ import frappe
 import requests
 import base64
 import json
-from datetime import datetime
 from frappe.utils import now_datetime, add_to_date, get_datetime
 
 class XeroBaseClient:
-    """Base client for Xero API requests with token and tenant management"""
-
     def __init__(self):
         self.base_url = "https://api.xero.com/api.xro/2.0"
         self.token_url = "https://identity.xero.com/connect/token"
         self.connections_url = "https://api.xero.com/connections"
         self.settings = self._get_settings()
         self.access_token = None
-        self.refresh_token = None
         self.token_expires_at = None
         self.tenant_id = None
 
@@ -26,14 +22,13 @@ class XeroBaseClient:
 
     def _get_settings_from_db(self):
         return frappe.db.get_value("Xero Settings", "Xero Settings", 
-            ["client_id", "client_secret", "access_token", "refresh_token", "token_expires_at", "tenant_id", "redirect_uri", "debug_mode"],
+            ["client_id", "client_secret", "access_token", "token_expires_at", "tenant_id", "redirect_uri", "debug_mode"],
             as_dict=True)
 
     def _update_settings(self, updates):
         try:
             for field, value in updates.items():
                 frappe.db.set_value("Xero Settings", None, field, value, update_modified=False)
-                frappe.log_error(field, value)
             frappe.db.commit()
             frappe.clear_cache(doctype="Xero Settings")
             return True
@@ -54,7 +49,7 @@ class XeroBaseClient:
         return (
             f"https://login.xero.com/identity/connect/authorize?"
             f"response_type=code&client_id={settings.client_id}&redirect_uri={settings.redirect_uri}"
-            f"&scope={scope}&state=32425161677711"
+            f"&scope={scope}&state=1415172789292"
         )
 
     def exchange_code_for_token(self, code):
@@ -75,45 +70,14 @@ class XeroBaseClient:
         if response.status_code == 200:
             tokens = response.json()
             self.access_token = tokens["access_token"]
-            self.refresh_token = tokens["refresh_token"]
             self.token_expires_at = add_to_date(now_datetime(), seconds=tokens["expires_in"] - 300)
             self._update_settings({
                 "access_token": self.access_token,
-                "refresh_token": self.refresh_token,
                 "token_expires_at": self.token_expires_at
             })
             self._get_tenant_id(self.access_token)
         else:
             frappe.throw(f"Failed to exchange code: {response.text}")
-
-    def refresh_access_token(self):
-        settings = self._get_settings_from_db()
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": settings.get("refresh_token")
-        }
-        headers = {
-            "Authorization": self._get_basic_auth_header(),
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-        response = requests.post(self.token_url, headers=headers, data=data)
-
-        self._log_api_call("/connect/token", "POST", data, response.text, response.status_code)
-
-        if response.status_code == 200:
-            tokens = response.json()
-            self.access_token = tokens["access_token"]
-            self.refresh_token = tokens["refresh_token"]
-            self.token_expires_at = add_to_date(now_datetime(), seconds=tokens["expires_in"] - 300)
-            self._update_settings({
-                "access_token": self.access_token,
-                "refresh_token": self.refresh_token,
-                "token_expires_at": self.token_expires_at
-            })
-        else:
-            if "invalid_grant" in response.text:
-                frappe.throw("Refresh token expired or invalid. Please reconnect to Xero.")
-            frappe.throw(f"Failed to refresh token: {response.text}")
 
     def _get_tenant_id(self, access_token):
         headers = {
@@ -121,7 +85,6 @@ class XeroBaseClient:
             "Content-Type": "application/json"
         }
         response = requests.get(self.connections_url, headers=headers)
-
         self._log_api_call("/connections", "GET", None, response.text, response.status_code)
 
         if response.status_code == 200:
@@ -129,28 +92,24 @@ class XeroBaseClient:
             if connections:
                 self.tenant_id = connections[0].get("tenantId")
                 self._update_settings({"tenant_id": self.tenant_id})
+            else:
+                frappe.throw("No Xero connections found.")
         else:
             frappe.throw(f"Failed to get tenant ID: {response.text}")
 
-    def _is_token_expired(self):
-        settings = self._get_settings_from_db()
-        if not settings.get("token_expires_at"):
-            return True
-        expires_at = get_datetime(settings["token_expires_at"])
-        return now_datetime() >= expires_at
-
-    def _ensure_token(self):
+    def make_request(self, method, endpoint, data=None, params=None):
         settings = self._get_settings_from_db()
         self.access_token = settings.get("access_token")
-        self.refresh_token = settings.get("refresh_token")
         self.token_expires_at = settings.get("token_expires_at")
         self.tenant_id = settings.get("tenant_id")
 
-        if self._is_token_expired():
-            self.refresh_access_token()
+        if not self.access_token or not self.tenant_id:
+            frappe.throw("Xero access token or tenant ID is missing. Please reconnect.")
 
-    def make_request(self, method, endpoint, data=None, params=None):
-        self._ensure_token()
+        expires_at = get_datetime(self.token_expires_at)
+        if now_datetime() >= expires_at:
+            frappe.throw("Access token expired. Please reconnect to Xero.")
+
         url = f"{self.base_url}{endpoint}"
         headers = {
             "Authorization": f"Bearer {self.access_token}",
@@ -160,17 +119,7 @@ class XeroBaseClient:
         }
 
         try:
-            if method == "GET":
-                res = requests.get(url, headers=headers, params=params)
-            elif method == "POST":
-                res = requests.post(url, headers=headers, json=data)
-            elif method == "PUT":
-                res = requests.put(url, headers=headers, json=data)
-            elif method == "DELETE":
-                res = requests.delete(url, headers=headers)
-            else:
-                frappe.throw("Unsupported method")
-
+            res = requests.request(method, url, headers=headers, json=data, params=params)
             self._log_api_call(endpoint, method, data or params, res.text, res.status_code)
 
             if res.status_code in [200, 201]:
