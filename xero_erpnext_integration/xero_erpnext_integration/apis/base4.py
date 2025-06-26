@@ -33,6 +33,7 @@ class XeroBaseClient:
         try:
             for field, value in updates.items():
                 frappe.db.set_value("Xero Settings", None, field, value, update_modified=False)
+                frappe.log_error(field, value)
             frappe.db.commit()
             frappe.clear_cache(doctype="Xero Settings")
             return True
