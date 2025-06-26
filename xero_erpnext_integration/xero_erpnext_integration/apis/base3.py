@@ -117,7 +117,11 @@ class XeroBaseClient:
                     now_datetime(), 
                     seconds=expires_in - 300
                 )
-                
+                xero_settings = frappe.get_single("Xero Settings")
+                xero_settings.access_token = self.access_token
+                xero_settings.token_expires_at = self.token_expires_at
+                xero_settings.save()
+                frappe.db.commit()
                 # Update database directly
                 # frappe.db.set_value("Xero Settings", None, "access_token", self.access_token, update_modified=False)
                 # frappe.db.set_value("Xero Settings", None, "token_expires_at", self.token_expires_at, update_modified=False)
@@ -133,6 +137,7 @@ class XeroBaseClient:
                 if not update_success:
                     frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
 
+                xero_settings.reload()
                 # Get tenant ID if not already set
                 # if not settings_data.get('tenant_id'):
                 #     self._get_tenant_id(self.access_token)
