@@ -64,7 +64,7 @@
   },
   {
    "fieldname": "refresh_token",
-   "fieldtype": "Password",
+   "fieldtype": "Data",
    "label": "Refresh Token"
   },
   {
@@ -113,7 +113,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-25 15:04:41.791547",
+ "modified": "2025-06-26 11:18:39.763116",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",
