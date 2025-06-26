@@ -37,6 +37,28 @@ class XeroBaseClient:
         
         return f"Basic {encoded_credentials}"
     
+    def _update_settings_safely(self, field_dict):
+        """Safely update Xero Settings using atomic database operations"""
+        try:
+            # Use direct database update to avoid document version conflicts
+            for field, value in field_dict.items():
+                frappe.db.set_value("Xero Settings", "Xero Settings", field, value)
+            
+            # Commit the transaction
+            frappe.db.commit()
+            
+            # Update the in-memory settings object
+            for field, value in field_dict.items():
+                setattr(self.settings, field, value)
+                
+            return True
+            
+        except Exception as e:
+            frappe.logger().error(f"Error updating Xero Settings: {str(e)}")
+            # Rollback in case of error
+            frappe.db.rollback()
+            return False
+    
     def _generate_access_token(self):
         """Generate access token using client credentials flow"""
         try:
@@ -47,8 +69,7 @@ class XeroBaseClient:
             
             data = {
                 "grant_type": "client_credentials",
-                "scope": "app.connections"
-                # "accounting.transactions accounting.contacts accounting.settings"
+                "scope": "app.connections, accounting.transactions, accounting.contacts, accounting.settings"
             }
             
             # Log request if debug mode is enabled
@@ -78,17 +99,14 @@ class XeroBaseClient:
                     seconds=expires_in - 300
                 )
                 
-                # Update settings with new token info - Atomic update approach
-                frappe.db.set_value("Xero Settings", "Xero Settings", {
+                # Update settings using safe atomic update
+                update_success = self._update_settings_safely({
                     "access_token": self.access_token,
                     "token_expires_at": self.token_expires_at
                 })
-                frappe.db.commit()
                 
-                # Update the in-memory object
-                self.settings.access_token = self.access_token
-                self.settings.token_expires_at = self.token_expires_at
-
+                if not update_success:
+                    frappe.logger().warning("Failed to save token to database, but token is valid in memory")
                 
                 # Get tenant ID if not already set
                 if not self.settings.tenant_id:
@@ -150,13 +168,14 @@ class XeroBaseClient:
                 if connections and len(connections) > 0:
                     self.tenant_id = connections[0].get("tenantId")
                     
-                    # Update settings - Atomic update approach
-                    frappe.db.set_value("Xero Settings", "Xero Settings", "tenant_id", self.tenant_id)
-                    frappe.db.commit()
+                    # Update settings using safe atomic update
+                    update_success = self._update_settings_safely({
+                        "tenant_id": self.tenant_id
+                    })
                     
-                    # Update the in-memory object
-                    self.settings.tenant_id = self.tenant_id
-
+                    if not update_success:
+                        frappe.logger().warning("Failed to save tenant_id to database, but tenant_id is valid in memory")
+                    
                     frappe.logger().info(f"Tenant ID retrieved: {self.tenant_id}")
                 else:
                     frappe.throw("No Xero connections found")
@@ -185,13 +204,17 @@ class XeroBaseClient:
         
         return now_datetime() >= expires_at
 
-    
     def _ensure_valid_token(self):
         """Ensure we have a valid access token"""
-        # Load existing token from settings
-        if self.settings.access_token and self.settings.token_expires_at:
-            self.access_token = self.settings.access_token
-            self.token_expires_at = self.settings.token_expires_at
+        # Refresh settings from database to get latest values
+        try:
+            fresh_settings = frappe.get_single("Xero Settings")
+            if fresh_settings.access_token and fresh_settings.token_expires_at:
+                self.access_token = fresh_settings.access_token
+                self.token_expires_at = fresh_settings.token_expires_at
+                self.settings = fresh_settings
+        except:
+            pass
         
         # Check if token is expired or missing
         if self._is_token_expired():
