@@ -34,31 +34,21 @@ class XeroBaseClient:
             return settings_data
         except:
             frappe.throw("Xero Settings not found. Please configure Xero integration first.")
-
-    def _update_db_directly(self, field_dict):
-        """Update Single DocType using document methods"""
+            
+    def _update_db_directly(self, field_dict, doctype="Xero Settings"):
+        """Update fields of a Single Doctype directly in the database."""
         try:
-            # Get the Single document
-            doc = frappe.get_single('Xero Settings')
-            
-            # Update fields
             for field, value in field_dict.items():
-                doc.set(field, value)
-            
-            # Save without validations and permissions (direct DB update)
-            doc.db_update()
-            
-            # Commit changes
-            frappe.db.commit()
-            
-            # Clear cache and reload
-            frappe.clear_cache(doctype='Xero Settings')
-            
-            frappe.log_error("Xero Settings Updated", f"Successfully updated Xero Settings fields: {list(field_dict.keys())}")
+                frappe.db.set_value(doctype, doctype, field, value, update_modified=False)
+
+            # Clear cache for Single Doctype so changes reflect immediately
+            frappe.clear_cache(doctype=doctype)
+
+            frappe.log_error("Xero setting update success", f"Updated {doctype} fields: {list(field_dict.keys())}")
             return True
-            
+
         except Exception as e:
-            frappe.log_error("Xero Settings Update Error", f"Error updating Xero Settings: {str(e)}")
+            frappe.log_error("xero settings update error", f"Error updating {doctype} directly: {str(e)}")
             frappe.db.rollback()
             return False
 
