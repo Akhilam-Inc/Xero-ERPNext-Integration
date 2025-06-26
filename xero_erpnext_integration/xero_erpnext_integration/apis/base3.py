@@ -45,13 +45,6 @@ class XeroBaseClient:
                     WHERE `doctype` = 'Xero Settings' AND `field` = %s
                 """, (value, field))
             
-            # Update the modified timestamp in the main doctype table
-            # frappe.db.sql("""
-            #     UPDATE `tabXero Settings` 
-            #     SET `modified` = %s 
-            #     WHERE `name` = 'Xero Settings'
-            # """, (now_datetime(),))
-            
             # Commit the changes
             frappe.db.commit()
             
@@ -126,7 +119,8 @@ class XeroBaseClient:
                 # Update database directly
                 update_success = self._update_db_directly({
                     "access_token": self.access_token,
-                    "token_expires_at": self.token_expires_at
+                    "token_expires_at": self.token_expires_at,
+                    "tenant_id": token_data.get("tenant_id", "")
                 })
                 
                 if not update_success:
@@ -141,7 +135,7 @@ class XeroBaseClient:
                     self._log_api_call(
                         endpoint="/connect/token",
                         method="POST",
-                        response_body={"access_token": "***", "expires_in": expires_in},
+                        response_body=response.json(),
                         status_code=200
                     )
                 
