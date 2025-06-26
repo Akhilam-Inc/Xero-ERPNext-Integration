@@ -24,40 +24,54 @@ class XeroBaseClient:
         except:
             frappe.throw("Xero Settings not found. Please configure Xero integration first.")
     
+    def _get_fresh_settings_from_db(self):
+        """Get fresh settings directly from database"""
+        try:
+            # Get settings directly from database without document loading
+            settings_data = frappe.db.get_value("Xero Settings", "Xero Settings", 
+                ["client_id", "client_secret", "access_token", "token_expires_at", "tenant_id", "debug_mode"], 
+                as_dict=True)
+            return settings_data
+        except:
+            frappe.throw("Xero Settings not found. Please configure Xero integration first.")
+    
+    def _update_db_directly(self, field_dict):
+        """Update database directly without document loading"""
+        try:
+            # Update each field directly in database
+            for field, value in field_dict.items():
+                frappe.db.sql("""
+                    UPDATE `tabXero Settings` 
+                    SET `{field}` = %s, `modified` = %s 
+                    WHERE `name` = 'Xero Settings'
+                """.format(field=field), (value, now_datetime()))
+            
+            # Commit the changes
+            frappe.db.commit()
+            
+            frappe.logger().info(f"Updated Xero Settings fields: {list(field_dict.keys())}")
+            return True
+            
+        except Exception as e:
+            frappe.logger().error(f"Error updating Xero Settings directly: {str(e)}")
+            frappe.db.rollback()
+            return False
+    
     def _get_basic_auth_header(self):
         """Generate Basic Auth header using client_id and client_secret"""
-        if not self.settings.client_id or not self.settings.client_secret:
+        # Get fresh settings from database
+        settings_data = self._get_fresh_settings_from_db()
+        
+        if not settings_data.get('client_id') or not settings_data.get('client_secret'):
             frappe.throw("Client ID and Client Secret are required")
         
         # Create credentials string
-        credentials = f"{self.settings.client_id}:52Hr3jJbh7z6cyKuYBX0OME3HGBrWreR98ULq-1GdAtE2Ho2"
+        credentials = f"{settings_data['client_id']}:52Hr3jJbh7z6cyKuYBX0OME3HGBrWreR98ULq-1GdAtE2Ho2"
         
         # Encode to base64
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
         
         return f"Basic {encoded_credentials}"
-    
-    def _update_settings_safely(self, field_dict):
-        """Safely update Xero Settings using atomic database operations"""
-        try:
-            # Use direct database update to avoid document version conflicts
-            for field, value in field_dict.items():
-                frappe.db.set_value("Xero Settings", "Xero Settings", field, value)
-            
-            # Commit the transaction
-            frappe.db.commit()
-            
-            # Update the in-memory settings object
-            for field, value in field_dict.items():
-                setattr(self.settings, field, value)
-                
-            return True
-            
-        except Exception as e:
-            frappe.logger().error(f"Error updating Xero Settings: {str(e)}")
-            # Rollback in case of error
-            frappe.db.rollback()
-            return False
     
     def _generate_access_token(self):
         """Generate access token using client credentials flow"""
@@ -69,11 +83,14 @@ class XeroBaseClient:
             
             data = {
                 "grant_type": "client_credentials",
-                "scope": "app.connections"
+                "scope": "app.connections, accounting.transactions, accounting.contacts, accounting.settings"
             }
             
+            # Get fresh settings for debug mode check
+            settings_data = self._get_fresh_settings_from_db()
+            
             # Log request if debug mode is enabled
-            if self.settings.debug_mode:
+            if settings_data.get('debug_mode'):
                 self._log_api_call(
                     endpoint="/connect/token",
                     method="POST",
@@ -99,8 +116,8 @@ class XeroBaseClient:
                     seconds=expires_in - 300
                 )
                 
-                # Update settings using safe atomic update
-                update_success = self._update_settings_safely({
+                # Update database directly
+                update_success = self._update_db_directly({
                     "access_token": self.access_token,
                     "token_expires_at": self.token_expires_at
                 })
@@ -109,11 +126,11 @@ class XeroBaseClient:
                     frappe.logger().warning("Failed to save token to database, but token is valid in memory")
                 
                 # Get tenant ID if not already set
-                if not self.settings.tenant_id:
+                if not settings_data.get('tenant_id'):
                     self._get_tenant_id()
                 
                 # Log successful response
-                if self.settings.debug_mode:
+                if settings_data.get('debug_mode'):
                     self._log_api_call(
                         endpoint="/connect/token",
                         method="POST",
@@ -128,7 +145,7 @@ class XeroBaseClient:
                 error_msg = f"Failed to generate access token: {response.status_code} - {response.text}"
                 
                 # Log error
-                if self.settings.debug_mode:
+                if settings_data.get('debug_mode'):
                     self._log_api_call(
                         endpoint="/connect/token",
                         method="POST",
@@ -168,8 +185,8 @@ class XeroBaseClient:
                 if connections and len(connections) > 0:
                     self.tenant_id = connections[0].get("tenantId")
                     
-                    # Update settings using safe atomic update
-                    update_success = self._update_settings_safely({
+                    # Update database directly
+                    update_success = self._update_db_directly({
                         "tenant_id": self.tenant_id
                     })
                     
@@ -206,24 +223,22 @@ class XeroBaseClient:
 
     def _ensure_valid_token(self):
         """Ensure we have a valid access token"""
-        # Refresh settings from database to get latest values
-        try:
-            fresh_settings = frappe.get_single("Xero Settings")
-            if fresh_settings.access_token and fresh_settings.token_expires_at:
-                self.access_token = fresh_settings.access_token
-                self.token_expires_at = fresh_settings.token_expires_at
-                self.settings = fresh_settings
-        except:
-            pass
+        # Get fresh settings from database
+        settings_data = self._get_fresh_settings_from_db()
+        
+        # Load token info from database
+        if settings_data.get('access_token') and settings_data.get('token_expires_at'):
+            self.access_token = settings_data['access_token']
+            self.token_expires_at = settings_data['token_expires_at']
         
         # Check if token is expired or missing
         if self._is_token_expired():
             frappe.logger().info("Access token expired or missing, generating new token")
             self._generate_access_token()
         
-        # Set tenant ID
-        if self.settings.tenant_id:
-            self.tenant_id = self.settings.tenant_id
+        # Set tenant ID from database
+        if settings_data.get('tenant_id'):
+            self.tenant_id = settings_data['tenant_id']
     
     def make_request(self, method, endpoint, data=None, params=None):
         """
@@ -255,8 +270,11 @@ class XeroBaseClient:
         }
         
         try:
+            # Get fresh settings for debug mode check
+            settings_data = self._get_fresh_settings_from_db()
+            
             # Log request if debug mode is enabled
-            if self.settings.debug_mode:
+            if settings_data.get('debug_mode'):
                 self._log_api_call(
                     endpoint=endpoint,
                     method=method,
@@ -280,7 +298,7 @@ class XeroBaseClient:
                 response_data = response.json() if response.content else {}
                 
                 # Log successful response
-                if self.settings.debug_mode:
+                if settings_data.get('debug_mode'):
                     self._log_api_call(
                         endpoint=endpoint,
                         method=method,
@@ -310,7 +328,8 @@ class XeroBaseClient:
                 if response.status_code in [200, 201]:
                     response_data = response.json() if response.content else {}
                     
-                    if self.settings.debug_mode:
+                    settings_data = self._get_fresh_settings_from_db()
+                    if settings_data.get('debug_mode'):
                         self._log_api_call(
                             endpoint=endpoint,
                             method=method,
@@ -338,8 +357,11 @@ class XeroBaseClient:
         status_code = response.status_code if response else 500
         response_text = response.text if response else ""
         
+        # Get fresh settings for debug mode check
+        settings_data = self._get_fresh_settings_from_db()
+        
         # Log error
-        if self.settings.debug_mode:
+        if settings_data.get('debug_mode'):
             self._log_api_call(
                 endpoint=endpoint,
                 method=method,
