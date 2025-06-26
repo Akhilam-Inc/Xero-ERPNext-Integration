@@ -116,7 +116,7 @@ class XeroBaseClient:
                 # Update database directly
                 frappe.db.set_value("Xero Settings", None, "access_token", self.access_token, update_modified=False)
                 frappe.db.set_value("Xero Settings", None, "token_expires_at", self.token_expires_at, update_modified=False)
-                frappe.clear_cache(doctype="Xero Settings")
+                # frappe.clear_cache(doctype="Xero Settings")
 
                 # update_success = self._update_db_directly({
                 #     "access_token": self.access_token,
