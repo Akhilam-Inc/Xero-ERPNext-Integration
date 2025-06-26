@@ -120,7 +120,6 @@ class XeroBaseClient:
                 update_success = self._update_db_directly({
                     "access_token": self.access_token,
                     "token_expires_at": self.token_expires_at,
-                    "tenant_id": token_data.get("tenant_id", "")
                 })
                 
                 if not update_success:
@@ -128,7 +127,7 @@ class XeroBaseClient:
 
                 # Get tenant ID if not already set
                 if not settings_data.get('tenant_id'):
-                    self._get_tenant_id()
+                    self._get_tenant_id(self, self.access_token)
                 
                 # Log successful response
                 if settings_data.get('debug_mode'):
@@ -166,12 +165,12 @@ class XeroBaseClient:
             error_msg = f"Unexpected error while generating access token: {str(e)}"
             frappe.log_error("error:",error_msg)
             frappe.throw(error_msg)
-    
-    def _get_tenant_id(self):
+
+    def _get_tenant_id(self, access_token):
         """Get tenant ID from Xero connections"""
         try:
             headers = {
-                "Authorization": f"Bearer {self.access_token}",
+                "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
             }
             
