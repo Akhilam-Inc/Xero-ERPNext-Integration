@@ -34,27 +34,34 @@ class XeroBaseClient:
             return settings_data
         except:
             frappe.throw("Xero Settings not found. Please configure Xero integration first.")
+
     def _update_db_directly(self, field_dict):
-        """Update database directly without document loading"""
+        """Update Single DocType using document methods"""
         try:
-            # For Single DocType, update each field with proper SQL escaping
-            for field, value in field_dict.items():
-                frappe.db.sql("""
-                    UPDATE `tabSingles` 
-                    SET `value` = %s 
-                    WHERE `doctype` = 'Xero Settings' AND `field` = %s
-                """, (value, field))
+            # Get the Single document
+            doc = frappe.get_single('Xero Settings')
             
-            # Commit the changes
+            # Update fields
+            for field, value in field_dict.items():
+                doc.set(field, value)
+            
+            # Save without validations and permissions (direct DB update)
+            doc.db_update()
+            
+            # Commit changes
             frappe.db.commit()
             
-            frappe.log_error("success:", f"Updated Xero Settings fields: {list(field_dict.keys())}")
+            # Clear cache and reload
+            frappe.clear_cache(doctype='Xero Settings')
+            
+            frappe.log_error("Xero Settings Updated", f"Successfully updated Xero Settings fields: {list(field_dict.keys())}")
             return True
             
         except Exception as e:
-            frappe.log_error("error:", f"Error updating Xero Settings directly: {str(e)}")
+            frappe.log_error("Xero Settings Update Error", f"Error updating Xero Settings: {str(e)}")
             frappe.db.rollback()
             return False
+
 
    
     def _get_basic_auth_header(self):
@@ -237,8 +244,8 @@ class XeroBaseClient:
             self._generate_access_token()
         
         # Set tenant ID from database
-        if settings_data.get('tenant_id'):
-            self.tenant_id = settings_data['tenant_id']
+        if settings_data.get('access_token'):
+            self.access_token = settings_data['access_token']
     
     def make_request(self, method, endpoint, data=None, params=None):
         """
@@ -256,7 +263,7 @@ class XeroBaseClient:
         # Ensure we have a valid token
         self._ensure_valid_token()
         
-        if not self.tenant_id:
+        if not self.access_token:
             frappe.throw("Tenant ID not found. Please check Xero connection.")
         
         # Prepare request
@@ -264,7 +271,7 @@ class XeroBaseClient:
         
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "Xero-tenant-id": self.tenant_id,
+            "Xero-tenant-id": self.access_token,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
