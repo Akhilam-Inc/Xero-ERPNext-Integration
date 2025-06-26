@@ -393,11 +393,12 @@ class XeroBaseClient:
     def test_connection(self):
         """Test the Xero API connection"""
         try:
+            response = self.make_request("GET", "/Invoices")
             return {
                     "status": "success",
-                    "message": "Connection test successful"
+                    "message": f"Connection test successful {response.json()}"
                 }
-            # response = self.make_request("GET", "/Invoices")
+            
             
             # if response:
             #     # org = response["Organisations"][0]
