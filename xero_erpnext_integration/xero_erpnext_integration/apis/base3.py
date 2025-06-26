@@ -39,18 +39,23 @@ class XeroBaseClient:
         """Update fields of a Single Doctype directly in the database."""
         try:
             for field, value in field_dict.items():
-                frappe.db.set_value(doctype, doctype, field, value, update_modified=False)
+                frappe.db.sql("""
+                    UPDATE `tabSingles`
+                    SET `value` = %s
+                    WHERE `doctype` = %s AND `field` = %s
+                """, (value, doctype, field))
 
-            # Clear cache for Single Doctype so changes reflect immediately
+            frappe.db.commit()
             frappe.clear_cache(doctype=doctype)
 
-            frappe.log_error("Xero setting update success", f"Updated {doctype} fields: {list(field_dict.keys())}")
+            frappe.log_error("success", f"Updated {doctype} fields: {list(field_dict.keys())}")
             return True
 
         except Exception as e:
-            frappe.log_error("xero settings update error", f"Error updating {doctype} directly: {str(e)}")
+            frappe.log_error("error", f"Error updating {doctype} directly: {str(e)}")
             frappe.db.rollback()
             return False
+
 
 
    
@@ -114,19 +119,19 @@ class XeroBaseClient:
                 )
                 
                 # Update database directly
-                frappe.db.set_value("Xero Settings", None, "access_token", self.access_token, update_modified=False)
-                frappe.db.set_value("Xero Settings", None, "token_expires_at", self.token_expires_at, update_modified=False)
+                # frappe.db.set_value("Xero Settings", None, "access_token", self.access_token, update_modified=False)
+                # frappe.db.set_value("Xero Settings", None, "token_expires_at", self.token_expires_at, update_modified=False)
                 # frappe.clear_cache(doctype="Xero Settings")
 
-                # update_success = self._update_db_directly({
-                #     "access_token": self.access_token,
-                #     "token_expires_at": self.token_expires_at,
-                # })
+                update_success = self._update_db_directly({
+                    "access_token": self.access_token,
+                    "token_expires_at": self.token_expires_at,
+                })
                 
 
                 
-                # if not update_success:
-                #     frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
+                if not update_success:
+                    frappe.log_error("warning:","Failed to save token to database, but token is valid in memory")
 
                 # Get tenant ID if not already set
                 # if not settings_data.get('tenant_id'):
