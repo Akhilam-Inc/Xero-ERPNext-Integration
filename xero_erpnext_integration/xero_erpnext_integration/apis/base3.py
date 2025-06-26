@@ -127,7 +127,7 @@ class XeroBaseClient:
 
                 # Get tenant ID if not already set
                 if not settings_data.get('tenant_id'):
-                    self._get_tenant_id(self, self.access_token)
+                    self._get_tenant_id(self.access_token)
                 
                 # Log successful response
                 if settings_data.get('debug_mode'):
