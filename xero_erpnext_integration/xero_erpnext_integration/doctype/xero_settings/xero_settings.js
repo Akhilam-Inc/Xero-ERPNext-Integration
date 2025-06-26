@@ -1,5 +1,10 @@
 frappe.ui.form.on('Xero Settings', {
     refresh: function(frm) {
+		const urlParams = new URLSearchParams(window.location.search);
+		const code = urlParams.get('code');
+		if (code) {
+			console.log(code)
+		}
         // Add custom buttons
         
         frm.add_custom_button(__('Get Organisation Info'), function() {

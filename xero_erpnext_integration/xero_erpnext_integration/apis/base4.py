@@ -53,7 +53,7 @@ class XeroBaseClient:
         return (
             f"https://login.xero.com/identity/connect/authorize?"
             f"response_type=code&client_id={settings.client_id}&redirect_uri={settings.redirect_uri}"
-            f"&scope={scope}&state=random_state_value"
+            f"&scope={scope}&state=32425161677711"
         )
 
     def exchange_code_for_token(self, code):
