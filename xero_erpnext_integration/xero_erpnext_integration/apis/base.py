@@ -71,14 +71,14 @@ class XeroAPIClient:
             frappe.log_error(f"Failed to generate authorization URL: {str(e)}", "Xero Auth URL")
             raise
     
-    def exchange_code_for_token(self, code, state=None):
+    def exchange_code_for_token(self, state=None):
         """Exchange authorization code for access token"""
         try:
             # Prepare token request
             token_data = {
                 "grant_type": "authorization_code",
                 # "client_id": self.client_id,
-                "code": code,
+                "code": self.settings.code,
                 "redirect_uri": self.redirect_uri
             }
             
