@@ -1,4 +1,7 @@
 frappe.ui.form.on('Contact', {
+    refresh(frm) {
+        console.log("I am here")
+    },
     before_save: function(frm) {
         frappe.call({
             method: 'xero_erpnext_integration.xero_erpnext_integration.apis.contact.create_contact',
