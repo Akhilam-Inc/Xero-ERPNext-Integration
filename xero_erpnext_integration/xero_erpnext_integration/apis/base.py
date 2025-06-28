@@ -229,7 +229,7 @@ class XeroAPIClient:
             request_headers = self.headers.copy()
             
             # Log request
-            self._log_request(method, url, data, params)
+            
             
             # Make request
             if method.upper() == "GET":
@@ -244,7 +244,7 @@ class XeroAPIClient:
                 frappe.throw(_("Unsupported HTTP method: {0}").format(method))
             
             # Log response
-            # self._log_response(response)
+            self._log_request(method, url, data, params, response)
             
             # Handle response
             if response.status_code in [200, 201]:
@@ -314,33 +314,7 @@ class XeroAPIClient:
         except Exception as e:
             return {"status": "error", "message": str(e)}
     
-    def get_contacts(self, contact_name=None):
-        """Get contacts from Xero"""
-        try:
-            params = {}
-            if contact_name:
-                params["where"] = f'Name=="{contact_name}"'
-            
-            response = self.make_request("GET", "Contacts", params=params)
-            return response.get("Contacts", []) if response else []
-            
-        except Exception as e:
-            frappe.log_error(f"Failed to get contacts: {str(e)}", "Xero Get Contacts")
-            return []
     
-    def create_contact(self, contact_data):
-        """Create contact in Xero"""
-        try:
-            data = {"Contacts": [contact_data]}
-            response = self.make_request("POST", "Contacts", data=data)
-            
-            if response and "Contacts" in response:
-                return response["Contacts"][0]
-            return None
-            
-        except Exception as e:
-            frappe.log_error(f"Failed to create contact: {str(e)}", "Xero Create Contact")
-            return None
     
     def create_invoice(self, invoice_data):
         """Create invoice in Xero"""
@@ -383,7 +357,7 @@ class XeroAPIClient:
             frappe.log_error(f"Failed to get payments: {str(e)}", "Xero Get Payments")
             return []
     
-    def _log_request(self, method, url, data, params):
+    def _log_request(self, method, url, data, params, response):
         """Log API request"""
         if not self.settings.debug_mode:
             return
@@ -398,7 +372,7 @@ class XeroAPIClient:
                     "params": params
                 }, indent=2) if (data or params) else "",
                 "timestamp": frappe.utils.now(),
-                "response": self.tenant_id
+                "response": json.dumps(response.json(), indent=2) if response else ""
             }
             
             frappe.get_doc(log_data).insert(ignore_permissions=True)
