@@ -13,12 +13,15 @@ frappe.ui.form.on('Contact', {
                     callback: function(r) {
                         if (r.message) {
                             if (r.message.status === 'success') {
+                                
                                 frappe.show_alert({
                                     title: 'Success',
                                     message: 'Contact created successfully in Xero',
                                     indicator: 'green'
                                 })
+                                frm.set_value("custom_contact_id", r.message.data[0].ContactID);
                                 frm.set_df_property("custom_send_to_xero", 'read_only', 1);
+                                frm.save()
                             } else {
                                 frappe.show_alert({
                                     title: 'Error',
