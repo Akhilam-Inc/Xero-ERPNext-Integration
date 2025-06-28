@@ -12,16 +12,17 @@
   "base_url",
   "client_id",
   "client_secret",
-  "tenant_id",
-  "tenant_name",
-  "webhook_secret",
+  "token_expires_at",
+  "redirect_uri",
+  "scope",
+  "code",
   "column_break_ftam",
   "access_token_url",
   "access_token",
   "refresh_token",
-  "token_expires_at",
-  "scope",
-  "redirect_uri"
+  "webhook_secret",
+  "tenant_id",
+  "tenant_name"
  ],
  "fields": [
   {
@@ -80,7 +81,7 @@
   },
   {
    "fieldname": "client_secret",
-   "fieldtype": "Password",
+   "fieldtype": "Data",
    "label": "Client Secret"
   },
   {
@@ -107,13 +108,18 @@
    "fieldname": "redirect_uri",
    "fieldtype": "Data",
    "label": "Redirect URI"
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "label": "Code"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-26 11:18:39.763116",
+ "modified": "2025-06-28 02:33:23.047511",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",
