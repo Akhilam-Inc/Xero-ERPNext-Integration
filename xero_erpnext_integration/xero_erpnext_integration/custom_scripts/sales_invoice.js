@@ -67,10 +67,10 @@ function send_invoice_to_xero(frm){
                     
                     frappe.show_alert({
                         title: 'Success',
-                        message: 'Invoice created successfully in Xero',
+                        message: r.message.data.message,
                         indicator: 'green'
                     })
-                    frm.set_value("custom_xero_invoice_number", r.message.data[0].InvoiceID);
+                    frm.set_value("custom_xero_invoice_number", r.message.data.InvoiceID);
                     frm.set_df_property("custom_xero_invoice_number", 'read_only', 1);
                     // frm.save()
                 } else {
