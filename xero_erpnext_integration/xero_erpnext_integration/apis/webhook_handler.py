@@ -55,7 +55,7 @@ class XeroWebhookHandler:
                 webhook_data = json.loads(payload_str)
             except json.JSONDecodeError as e:
                 error_msg = f"Invalid JSON payload: {str(e)}. Payload: {payload_str[:500]}"
-                frappe.log_error(error_msg, "Xero Webhook JSON Parse Error")
+                frappe.log_error("Xero Webhook JSON Parse Error", error_msg)
                 return {"status": "error", "message": f"Invalid JSON payload: {str(e)}"}
             
             # Validate webhook data structure
@@ -78,7 +78,7 @@ class XeroWebhookHandler:
                     results.append(result)
                 except Exception as e:
                     error_msg = f"Failed to process event {event.get('eventId', 'unknown')}: {str(e)}"
-                    frappe.log_error(error_msg, "Xero Webhook Event Error")
+                    frappe.log_error("Xero Webhook Event Error", error_msg)
                     results.append({"status": "error", "message": error_msg})
             
             return {"status": "success", "processed_events": len(results), "results": results}
@@ -117,7 +117,7 @@ class XeroWebhookHandler:
             return hmac.compare_digest(signature, expected_signature)
             
         except Exception as e:
-            frappe.log_error(f"Signature verification failed: {str(e)}", "Xero Webhook Signature")
+            frappe.log_error("Xero Webhook Signature", f"Signature verification failed: {str(e)}")
             return False
     
     def _process_event(self, event):
@@ -166,7 +166,7 @@ class XeroWebhookHandler:
             
         except Exception as e:
             error_msg = f"Failed to handle invoice update: {str(e)}"
-            frappe.log_error(error_msg, "Xero Invoice Update Handler")
+            frappe.log_error("Xero Invoice Update Handler", error_msg)
             return {"status": "error", "message": error_msg}
     
     def _handle_payment_create(self, resource_url, resource_id):
@@ -201,7 +201,7 @@ class XeroWebhookHandler:
             
         except Exception as e:
             error_msg = f"Failed to handle payment creation: {str(e)}"
-            frappe.log_error(error_msg, "Xero Payment Create Handler")
+            frappe.log_error("Xero Payment Create Handler", error_msg)
             return {"status": "error", "message": error_msg}
     
     def _handle_payment_update(self, resource_url, resource_id):
@@ -231,7 +231,7 @@ class XeroWebhookHandler:
             return None
             
         except Exception as e:
-            frappe.log_error(f"Error finding ERPNext invoice: {str(e)}", "Xero Invoice Lookup")
+            frappe.log_error("Xero Invoice Lookup", f"Error finding ERPNext invoice: {str(e)}")
             return None
     
     def _create_payment_entry(self, sales_invoice, xero_invoice):
@@ -264,7 +264,7 @@ class XeroWebhookHandler:
             
         except Exception as e:
             error_msg = f"Failed to create payment entry: {str(e)}"
-            frappe.log_error(error_msg, "Xero Payment Entry Creation")
+            frappe.log_error("Xero Payment Entry Creation", error_msg)
             return {"status": "error", "message": error_msg}
     
     def _create_payment_entry_from_payment(self, sales_invoice, xero_payment):
@@ -310,7 +310,7 @@ class XeroWebhookHandler:
             
         except Exception as e:
             error_msg = f"Failed to create payment entry from Xero payment: {str(e)}"
-            frappe.log_error(error_msg, "Xero Payment Entry Creation")
+            frappe.log_error("Xero Payment Entry Creation", error_msg)
             return {"status": "error", "message": error_msg}
     
     def _get_default_receivable_account(self, company):
@@ -365,7 +365,7 @@ class XeroWebhookHandler:
             log_doc.insert(ignore_permissions=True)
             
         except Exception as e:
-            frappe.log_error(f"Failed to log webhook: {str(e)}", "Xero Webhook Log Error")
+            frappe.log_error("Xero Webhook Log Error", f"Failed to log webhook: {str(e)}")
 
 
 # API endpoint for webhook
@@ -418,7 +418,7 @@ def handle_xero_webhook():
         # If still no payload, return error with debug info
         if not payload:
             error_msg = "No payload received from webhook"
-            frappe.log_error(f"{error_msg}. Headers: {dict(frappe.request.headers)}", "Xero Webhook No Payload")
+            frappe.log_error("Xero Webhook No Payload", f"{error_msg}. Headers: {dict(frappe.request.headers)}")
             return {
                 "status": "error", 
                 "message": error_msg,
@@ -444,7 +444,7 @@ def handle_xero_webhook():
         
     except Exception as e:
         error_msg = f"Webhook endpoint error: {str(e)}"
-        frappe.log_error(error_msg, "Xero Webhook Endpoint")
+        frappe.log_error("Xero Webhook Endpoint", error_msg)
         
         frappe.response["message"] = {"status": "error", "message": error_msg}
         frappe.response["http_status_code"] = 500
@@ -461,9 +461,8 @@ def test_webhook_processing(payload):
         return handler.process_webhook(payload)
         
     except Exception as e:
-        frappe.log_error(f"Test webhook processing failed: {str(e)}", "Xero Test Webhook")
+        frappe.log_error("Xero Test Webhook", f"Test webhook processing failed: {str(e)}")
         return {"status": "error", "message": str(e)}
-
 
 # Test endpoint to check webhook URL accessibility
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
