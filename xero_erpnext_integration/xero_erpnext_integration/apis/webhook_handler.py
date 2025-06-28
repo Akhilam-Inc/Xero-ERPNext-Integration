@@ -23,8 +23,8 @@ class XeroWebhookHandler:
         """
         try:
             # Debug: Log raw payload info
-            frappe.log_error("webook log",f"Raw payload type: {type(payload)}")
-            frappe.log_error("webook log",f"Raw payload length: {len(payload) if payload else 0}")
+            frappe.log_error("webhook log",f"Raw payload type: {type(payload)}")
+            frappe.log_error("webhook log",f"Raw payload length: {len(payload) if payload else 0}")
             
             # Handle empty payload
             if not payload:
@@ -39,7 +39,7 @@ class XeroWebhookHandler:
                 payload_str = json.dumps(payload)
             
             # Debug: Log processed payload
-            frappe.log_error("webook log",f"Processed payload: {payload_str[:200]}...")  # First 200 chars
+            frappe.log_error("webhook log",f"Processed payload: {payload_str[:200]}...")  # First 200 chars
             
             # Handle empty string
             if not payload_str.strip():
@@ -97,7 +97,7 @@ class XeroWebhookHandler:
     def _verify_signature(self, payload, signature):
         """Verify webhook signature using HMAC-SHA256"""
         try:
-            webhook_secret = self.settings.get_password("webhook_secret")
+            webhook_secret = self.settings.webhook_secret
             if not webhook_secret:
                 return True  # Skip verification if no secret configured
             
@@ -131,7 +131,7 @@ class XeroWebhookHandler:
         resource_id = event.get("resourceId")
         
         # Log event processing
-        frappe.log_error("webook log",f"Processing Xero webhook event: {event_category}.{event_type} for resource {resource_id}")
+        frappe.log_error("webhook log",f"Processing Xero webhook event: {event_category}.{event_type} for resource {resource_id}")
         
         # Handle different event types
         if event_category == "INVOICE" and event_type == "UPDATE":
@@ -382,38 +382,38 @@ def handle_xero_webhook():
         # Method 1: Get raw data
         try:
             payload = frappe.request.get_data()
-            frappe.log_error("webook log",f"Method 1 - Raw data: {type(payload)}, length: {len(payload) if payload else 0}")
+            frappe.log_error("webhook log",f"Method 1 - Raw data: {type(payload)}, length: {len(payload) if payload else 0}")
         except Exception as e:
-            frappe.log_error("webook log",f"Method 1 failed: {str(e)}")
+            frappe.log_error("webhook log",f"Method 1 failed: {str(e)}")
         
         # Method 2: Try form data if raw data is empty
         if not payload:
             try:
                 payload = frappe.request.form.to_dict()
-                frappe.log_error("webook log",f"Method 2 - Form data: {payload}")
+                frappe.log_error("webhook log",f"Method 2 - Form data: {payload}")
             except Exception as e:
-                frappe.log_error("webook log",f"Method 2 failed: {str(e)}")
+                frappe.log_error("webhook log",f"Method 2 failed: {str(e)}")
         
         # Method 3: Try JSON data
         if not payload:
             try:
                 payload = frappe.request.get_json()
-                frappe.log_error("webook log",f"Method 3 - JSON data: {payload}")
+                frappe.log_error("webhook log",f"Method 3 - JSON data: {payload}")
             except Exception as e:
-                frappe.log_error("webook log",f"Method 3 failed: {str(e)}")
+                frappe.log_error("webhook log",f"Method 3 failed: {str(e)}")
         
         # Method 4: Try request data as string
         if not payload:
             try:
                 payload = frappe.request.data
-                frappe.log_error("webook log",f"Method 4 - Request data: {type(payload)}, length: {len(payload) if payload else 0}")
+                frappe.log_error("webhook log",f"Method 4 - Request data: {type(payload)}, length: {len(payload) if payload else 0}")
             except Exception as e:
-                frappe.log_error("webook log",f"Method 4 failed: {str(e)}")
+                frappe.log_error("webhook log",f"Method 4 failed: {str(e)}")
         
         # Log all request headers for debugging
-        frappe.log_error("webook log",f"Request headers: {dict(frappe.request.headers)}")
-        frappe.log_error("webook log",f"Request method: {frappe.request.method}")
-        frappe.log_error("webook log",f"Request content type: {frappe.request.content_type}")
+        frappe.log_error("webhook log",f"Request headers: {dict(frappe.request.headers)}")
+        frappe.log_error("webhook log",f"Request method: {frappe.request.method}")
+        frappe.log_error("webhook log",f"Request content type: {frappe.request.content_type}")
         
         # If still no payload, return error with debug info
         if not payload:
