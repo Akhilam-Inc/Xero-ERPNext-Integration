@@ -9,8 +9,8 @@ frappe.ui.form.on('Xero Settings', {
 		}
         // Add custom buttons
         
-        frm.add_custom_button(__('Get Organisation Info'), function() {
-            get_organisation_info(frm);
+        frm.add_custom_button(__('Authorize'), function() {
+            authorize(frm);
         });
         
         frm.add_custom_button(__('Sync Pending Invoices'), function() {
@@ -108,3 +108,50 @@ function sync_pending_invoices(frm) {
         }
     );
 }
+
+function authorize(frm) {
+    // Check if required fields are filled
+    if (!frm.doc.client_id) {
+        frappe.msgprint({
+            title: __('Missing Client ID'),
+            message: __('Please enter the Client ID before authorizing.'),
+            indicator: 'red'
+        });
+        return;
+    }
+    
+    if (!frm.doc.redirect_uri) {
+        frappe.msgprint({
+            title: __('Missing Redirect URI'),
+            message: __('Please enter the Redirect URI before authorizing.'),
+            indicator: 'red'
+        });
+        return;
+    }
+    
+    // Build authorization URL with parameters from form
+    const baseUrl = 'https://login.xero.com/identity/connect/authorize';
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: frm.doc.client_id,
+        redirect_uri: frm.doc.redirect_uri,
+        scope: frm.doc.scope || 'openid profile email accounting.transactions',
+        state: frm.doc.state || Math.random().toString(36).substring(2, 15)
+    });
+    
+    const authUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Save the state value to the document for verification later
+    if (!frm.doc.state) {
+        frm.set_value('state', params.get('state'));
+    }
+    
+    // Open authorization URL in new window/tab
+    window.open(authUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
+    
+    frappe.show_alert({
+        message: __('Authorization window opened. Please complete the authorization process.'),
+        indicator: 'blue'
+    });
+}
+
