@@ -113,7 +113,8 @@ def create_invoice(doc, method=None):
         }
         
     except Exception as e:
-        frappe.log_error(f"Failed to create invoice in Xero: {str(e)}", "Xero Create Invoice")
+        frappe.log_error("Xero Create Invoice", f"Failed to create invoice in Xero: {str(e)}")
+        frappe.throw(f"Failed to create invoice in Xero: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
