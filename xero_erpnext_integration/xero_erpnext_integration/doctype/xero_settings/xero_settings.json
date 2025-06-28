@@ -16,12 +16,13 @@
   "state",
   "scope",
   "code",
+  "webhook_secret",
   "column_break_ftam",
   "access_token_url",
   "access_token",
   "redirect_uri",
+  "tenant_id_url",
   "refresh_token",
-  "webhook_secret",
   "tenant_id",
   "tenant_name"
  ],
@@ -119,13 +120,18 @@
    "fieldname": "state",
    "fieldtype": "Data",
    "label": "State"
+  },
+  {
+   "fieldname": "tenant_id_url",
+   "fieldtype": "Data",
+   "label": "Tenant ID URL"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-28 02:40:12.087607",
+ "modified": "2025-06-28 02:47:58.104953",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",
