@@ -22,20 +22,40 @@ class XeroWebhookHandler:
         Process incoming webhook from Xero
         """
         try:
+            # Convert payload to string if it's bytes
+            if isinstance(payload, bytes):
+                payload_str = payload.decode('utf-8')
+            elif isinstance(payload, str):
+                payload_str = payload
+            else:
+                payload_str = json.dumps(payload)
+            
             # Verify webhook signature if webhook secret is configured
             if self.settings.webhook_secret and signature:
-                if not self._verify_signature(payload, signature):
+                if not self._verify_signature(payload_str, signature):
                     frappe.throw(_("Invalid webhook signature"), frappe.AuthenticationError)
             
             # Parse webhook payload
-            webhook_data = json.loads(payload) if isinstance(payload, str) else payload
+            try:
+                webhook_data = json.loads(payload_str)
+            except json.JSONDecodeError as e:
+                frappe.throw(_("Invalid JSON payload: {0}").format(str(e)))
+            
+            # Validate webhook data structure
+            if not isinstance(webhook_data, dict):
+                frappe.throw(_("Webhook payload must be a JSON object"))
             
             # Log webhook received
             self._log_webhook("Received", webhook_data)
             
             # Process each event in the webhook
             results = []
-            for event in webhook_data.get("events", []):
+            events = webhook_data.get("events", [])
+            
+            if not events:
+                return {"status": "success", "message": "No events to process", "processed_events": 0}
+            
+            for event in events:
                 try:
                     result = self._process_event(event)
                     results.append(result)
@@ -49,7 +69,7 @@ class XeroWebhookHandler:
         except Exception as e:
             error_msg = f"Webhook processing failed: {str(e)}"
             frappe.log_error(error_msg, "Xero Webhook Error")
-            self._log_webhook("Error", {"error": error_msg})
+            self._log_webhook("Error", {"error": error_msg, "payload_type": str(type(payload))})
             return {"status": "error", "message": error_msg}
     
     def _verify_signature(self, payload, signature):
@@ -59,11 +79,14 @@ class XeroWebhookHandler:
             if not webhook_secret:
                 return True  # Skip verification if no secret configured
             
+            # Ensure payload is bytes for HMAC calculation
+            payload_bytes = payload.encode('utf-8') if isinstance(payload, str) else payload
+            
             # Calculate expected signature
             expected_signature = base64.b64encode(
                 hmac.new(
                     webhook_secret.encode('utf-8'),
-                    payload.encode('utf-8') if isinstance(payload, str) else payload,
+                    payload_bytes,
                     hashlib.sha256
                 ).digest()
             ).decode('utf-8')
@@ -77,6 +100,9 @@ class XeroWebhookHandler:
     
     def _process_event(self, event):
         """Process individual webhook event"""
+        if not isinstance(event, dict):
+            return {"status": "error", "message": "Invalid event format"}
+            
         event_category = event.get("eventCategory")
         event_type = event.get("eventType")
         resource_url = event.get("resourceUrl")
@@ -330,6 +356,7 @@ def handle_xero_webhook():
     try:
         # Get request data
         payload = frappe.request.get_data()
+        signature = frappe.request.
         signature = frappe.request.headers.get("X-Xero-Signature")
         
         # Process webhook
@@ -362,3 +389,4 @@ def test_webhook_processing(payload):
         
     except Exception as e:
         frappe.log_error(f"Test webhook processing failed: {str(e)}", "Xero Test Webhook")
+        return {"status": "error", "message": str(e)}
