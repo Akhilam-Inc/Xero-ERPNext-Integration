@@ -505,6 +505,7 @@ def handle_xero_webhook_intent():
         provided_signature = frappe.request.headers.get('X-Xero-Signature')
         hashed = hmac.new(bytes(key, 'utf8'), frappe.request.get_data(), hashlib.sha256)
         generated_signature = base64.b64encode(hashed.digest()).decode('utf-8')
+        frappe.log_error("Xero Webhook Signature", f"Provided Signature: {provided_signature}, Generated Signature: {generated_signature}")
         if provided_signature != generated_signature:
             return '', 401
         else:
