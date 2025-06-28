@@ -203,3 +203,5 @@ def get_default_cash_account():
     """Get default cash account"""  
     company = frappe.defaults.get_user_default("Company")
     return frappe.db.get_value("Company", company, "default_cash_account")
+
+
