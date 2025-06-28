@@ -6,7 +6,7 @@ frappe.ui.form.on('Contact', {
         frappe.call({
             method: 'xero_erpnext_integration.xero_erpnext_integration.apis.contact.create_contact',
             args:{
-                doc: frm.doc
+                doc: frm.doc.name
             },
             callback: function(r) {
                 if (r.message) {

@@ -40,7 +40,7 @@ def create_contact(doc, method=None):
     """Create contact in Xero"""
     try:
         client = get_xero_client()
-        contact = frappe.get_doc("Contact", doc.name)
+        contact = frappe.get_doc("Contact", doc)
         contact_data = {
             "FirstName": contact.first_name or "",
             "LastName": contact.last_name or "",
