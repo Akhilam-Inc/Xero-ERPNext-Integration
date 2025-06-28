@@ -82,11 +82,11 @@ def get_account_code(account_name):
     try:
         account = frappe.get_doc("Account", account_name)
 
-        if account.get("account_number"):
-            return account.account_number
+        # if account.get("account_number"):
+        #     return account.account_number
             
         # Default fallback
-        return "001"  # Default bank account code
+        return "880"  # Default bank account code
         
     except Exception as e:
         frappe.log_error("Get Account Code", f"Error getting account code for {account_name}: {str(e)}")
