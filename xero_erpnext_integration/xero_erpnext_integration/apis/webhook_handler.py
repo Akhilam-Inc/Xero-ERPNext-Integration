@@ -22,6 +22,14 @@ class XeroWebhookHandler:
         Process incoming webhook from Xero
         """
         try:
+            # Debug: Log raw payload info
+            frappe.logger().info(f"Raw payload type: {type(payload)}")
+            frappe.logger().info(f"Raw payload length: {len(payload) if payload else 0}")
+            
+            # Handle empty payload
+            if not payload:
+                return {"status": "error", "message": "Empty payload received"}
+            
             # Convert payload to string if it's bytes
             if isinstance(payload, bytes):
                 payload_str = payload.decode('utf-8')
@@ -29,6 +37,13 @@ class XeroWebhookHandler:
                 payload_str = payload
             else:
                 payload_str = json.dumps(payload)
+            
+            # Debug: Log processed payload
+            frappe.logger().info(f"Processed payload: {payload_str[:200]}...")  # First 200 chars
+            
+            # Handle empty string
+            if not payload_str.strip():
+                return {"status": "error", "message": "Empty payload string received"}
             
             # Verify webhook signature if webhook secret is configured
             if self.settings.webhook_secret and signature:
@@ -39,11 +54,13 @@ class XeroWebhookHandler:
             try:
                 webhook_data = json.loads(payload_str)
             except json.JSONDecodeError as e:
-                frappe.throw(_("Invalid JSON payload: {0}").format(str(e)))
+                error_msg = f"Invalid JSON payload: {str(e)}. Payload: {payload_str[:500]}"
+                frappe.log_error(error_msg, "Xero Webhook JSON Parse Error")
+                return {"status": "error", "message": f"Invalid JSON payload: {str(e)}"}
             
             # Validate webhook data structure
             if not isinstance(webhook_data, dict):
-                frappe.throw(_("Webhook payload must be a JSON object"))
+                return {"status": "error", "message": "Webhook payload must be a JSON object"}
             
             # Log webhook received
             self._log_webhook("Received", webhook_data)
@@ -69,7 +86,12 @@ class XeroWebhookHandler:
         except Exception as e:
             error_msg = f"Webhook processing failed: {str(e)}"
             frappe.log_error(error_msg, "Xero Webhook Error")
-            self._log_webhook("Error", {"error": error_msg, "payload_type": str(type(payload))})
+            self._log_webhook("Error", {
+                "error": error_msg, 
+                "payload_type": str(type(payload)),
+                "payload_length": len(payload) if payload else 0,
+                "payload_preview": str(payload)[:200] if payload else "None"
+            })
             return {"status": "error", "message": error_msg}
     
     def _verify_signature(self, payload, signature):
@@ -354,8 +376,60 @@ def handle_xero_webhook():
     URL: /api/method/xero_erpnext_integration.apis.webhook_handler.handle_xero_webhook
     """
     try:
-        # Get request data
-        payload = frappe.request.get_data()
+        # Get request data - try multiple methods
+        payload = None
+        
+        # Method 1: Get raw data
+        try:
+            payload = frappe.request.get_data()
+            frappe.logger().info(f"Method 1 - Raw data: {type(payload)}, length: {len(payload) if payload else 0}")
+        except Exception as e:
+            frappe.logger().info(f"Method 1 failed: {str(e)}")
+        
+        # Method 2: Try form data if raw data is empty
+        if not payload:
+            try:
+                payload = frappe.request.form.to_dict()
+                frappe.logger().info(f"Method 2 - Form data: {payload}")
+            except Exception as e:
+                frappe.logger().info(f"Method 2 failed: {str(e)}")
+        
+        # Method 3: Try JSON data
+        if not payload:
+            try:
+                payload = frappe.request.get_json()
+                frappe.logger().info(f"Method 3 - JSON data: {payload}")
+            except Exception as e:
+                frappe.logger().info(f"Method 3 failed: {str(e)}")
+        
+        # Method 4: Try request data as string
+        if not payload:
+            try:
+                payload = frappe.request.data
+                frappe.logger().info(f"Method 4 - Request data: {type(payload)}, length: {len(payload) if payload else 0}")
+            except Exception as e:
+                frappe.logger().info(f"Method 4 failed: {str(e)}")
+        
+        # Log all request headers for debugging
+        frappe.logger().info(f"Request headers: {dict(frappe.request.headers)}")
+        frappe.logger().info(f"Request method: {frappe.request.method}")
+        frappe.logger().info(f"Request content type: {frappe.request.content_type}")
+        
+        # If still no payload, return error with debug info
+        if not payload:
+            error_msg = "No payload received from webhook"
+            frappe.log_error(f"{error_msg}. Headers: {dict(frappe.request.headers)}", "Xero Webhook No Payload")
+            return {
+                "status": "error", 
+                "message": error_msg,
+                "debug_info": {
+                    "headers": dict(frappe.request.headers),
+                    "method": frappe.request.method,
+                    "content_type": frappe.request.content_type
+                }
+            }
+        
+        # Get signature
         signature = frappe.request.headers.get("X-Xero-Signature")
         
         # Process webhook
@@ -389,3 +463,39 @@ def test_webhook_processing(payload):
     except Exception as e:
         frappe.log_error(f"Test webhook processing failed: {str(e)}", "Xero Test Webhook")
         return {"status": "error", "message": str(e)}
+
+
+# Test endpoint to check webhook URL accessibility
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+def test_webhook_endpoint():
+    """Test endpoint to verify webhook URL is accessible"""
+    try:
+        method = frappe.request.method
+        headers = dict(frappe.request.headers)
+        
+        if method == "GET":
+            return {
+                "status": "success",
+                "message": "Webhook endpoint is accessible",
+                "method": method,
+                "timestamp": now()
+            }
+        else:
+            # For POST, return request details
+            payload = frappe.request.get_data()
+            return {
+                "status": "success",
+                "message": "Webhook endpoint received POST request",
+                "method": method,
+                "payload_type": str(type(payload)),
+                "payload_length": len(payload) if payload else 0,
+                "headers": headers,
+                "timestamp": now()
+            }
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "timestamp": now()
+        }
