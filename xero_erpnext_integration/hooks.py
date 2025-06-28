@@ -44,7 +44,8 @@ app_license = "mit"
 
 # include js in doctype views
 doctype_js = {
-    "Contact" : "xero_erpnext_integration/custom_scripts/contact.js"
+    "Contact" : "xero_erpnext_integration/custom_scripts/contact.js",
+    "Sales Invoice" : "xero_erpnext_integration/custom_scripts/sales_invoice.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
