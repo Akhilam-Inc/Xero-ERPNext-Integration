@@ -363,23 +363,46 @@ class XeroAPIClient:
             return
         
         try:
+            # Determine message based on response status
+            message = "Success"
+            if response:
+                if response.status_code >= 400:
+                    message = "Error"
+                elif response.status_code >= 300:
+                    message = "Redirect"
+            else:
+                message = "No Response"
+            
+            # Prepare headers for logging (exclude sensitive information)
+            headers_to_log = self.headers.copy()
+            if "Authorization" in headers_to_log:
+                # Mask the token for security
+                auth_header = headers_to_log["Authorization"]
+                if "Bearer" in auth_header:
+                    headers_to_log["Authorization"] = "Bearer ***MASKED***"
+                elif "Basic" in auth_header:
+                    headers_to_log["Authorization"] = "Basic ***MASKED***"
+            
             log_data = {
                 "doctype": "Xero API Log",
                 "api_method": method,
                 "api_url": url,
+                "message": message,
+                "headers": json.dumps(headers_to_log, indent=2),
                 "payload": json.dumps({
                     "data": data,
                     "params": params
                 }, indent=2) if (data or params) else "",
                 "timestamp": frappe.utils.now(),
-                "response": json.dumps(response.json(), indent=2) if response else ""
+                "status_code": str(response.status_code) if response else "",
+                "response": json.dumps(response.json(), indent=2) if response and response.status_code < 400 else (response.text if response else "")
             }
             
             frappe.get_doc(log_data).insert(ignore_permissions=True)
             
         except Exception as e:
             frappe.log_error(f"Failed to log request: {str(e)}", "Xero Request Log")
-    
+
     def _log_response(self, response):
         """Log API response"""
         if not self.settings.debug_mode:
