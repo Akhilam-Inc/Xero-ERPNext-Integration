@@ -13,9 +13,18 @@ frappe.ui.form.on('Contact', {
                     callback: function(r) {
                         if (r.message) {
                             if (r.message.status === 'success') {
-                                console.log(r.message)
+                                frappe.show_alert({
+                                    title: 'Success',
+                                    message: 'Contact created successfully in Xero',
+                                    indicator: 'green'
+                                })
+                                frm.set_df_property("custom_send_to_xero", 'read_only', 1);
                             } else {
-                                console.log(r)
+                                frappe.show_alert({
+                                    title: 'Error',
+                                    message: 'Error creating contact in Xero',
+                                    indicator: 'red'
+                                })
                             }
                         }
                     }
