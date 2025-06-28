@@ -34,8 +34,8 @@ class XeroAPIClient:
         self.scope = "accounting.transactions accounting.contacts accounting.settings offline_access"
         
         # Current session tokens
-        self.access_token = self.settings.get_password("access_token")
-        self.refresh_token = self.settings.get_password("refresh_token")
+        self.access_token = self.settings.access_token
+        self.refresh_token = self.settings.refresh_token
         self.tenant_id = self.settings.tenant_id
         
         # Initialize headers
@@ -188,7 +188,7 @@ class XeroAPIClient:
                 self.settings.save()
                 
                 # Update headers
-                self.access_token = self.settings.get_password("access_token")
+                self.access_token = self.settings.access_token
                 self.headers["Authorization"] = f"Bearer {self.access_token}"
                 
                 return True
@@ -440,31 +440,4 @@ def get_xero_client():
     """Get configured Xero API client"""
     return XeroAPIClient()
 
-
-# Legacy XeroBase class for backward compatibility
-class XeroBase:
-    """Legacy base class - redirects to new XeroAPIClient"""
-    
-    def __init__(self):
-        self.client = get_xero_client()
-        
-        # Map old attributes to new client
-        self.config = self.client.settings
-        self.enabled = self.config.enable
-        self.headers = self.client.headers
-    
-    def get(self, endpoint=None, params=None, headers=None):
-        return self.client.make_request("GET", endpoint, params=params)
-    
-    def post(self, endpoint, json=None, params=None, headers=None):
-        return self.client.make_request("POST", endpoint, data=json, params=params)
-    
-    def put(self, endpoint, json=None, headers=None):
-        return self.client.make_request("PUT", endpoint, data=json)
-    
-    def delete(self, endpoint=None, params=None, headers=None):
-        return self.client.make_request("DELETE", endpoint, params=params)
-    
-    def test_connection(self):
-        return self.client.test_connection()
 
