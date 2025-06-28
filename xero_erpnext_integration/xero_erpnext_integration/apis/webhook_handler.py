@@ -5,7 +5,7 @@ import json
 import hmac
 import hashlib
 import base64
-from .base2 import get_xero_client
+from .base import get_xero_client
 
 class XeroWebhookHandler:
     """
@@ -306,12 +306,12 @@ class XeroWebhookHandler:
             log_doc = frappe.get_doc({
                 "doctype": "Xero API Log",
                 "api_method": "WEBHOOK",
-                "api_endpoint": "/webhook",
+                "api_url": "/webhook",
                 "status_code": 200 if status == "Received" else 500,
                 "message": f"Webhook {status}",
-                "request_payload": json.dumps(data, indent=2),
+                "payload": json.dumps(data, indent=2),
                 "timestamp": now(),
-                "tenant_id": self.settings.tenant_id
+                # "tenant_id": self.settings.tenant_id
             })
             
             log_doc.insert(ignore_permissions=True)

@@ -14,9 +14,9 @@ frappe.ui.form.on('Xero Settings', {
             authorize(frm);
         });
         
-        frm.add_custom_button(__('Get Invoices'), function() {
+        frm.add_custom_button(__('Test Webhook'), function() {
             frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_xero_invoices',
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.webhook_handler.test_webhook',
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
@@ -29,20 +29,20 @@ frappe.ui.form.on('Xero Settings', {
             });
         });
 
-        frm.add_custom_button(__('Get Contacts'), function() {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_xero_contacts',
-                callback: function(r) {
-                    if (r.message) {
-                        if (r.message.status === 'success') {
-                           console.log(r.message)
-                        } else {
-                            console.log(r)
-                        }
-                    }
-                }
-            });
-        });
+        // frm.add_custom_button(__('Get Contacts'), function() {
+        //     frappe.call({
+        //         method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_xero_contacts',
+        //         callback: function(r) {
+        //             if (r.message) {
+        //                 if (r.message.status === 'success') {
+        //                    console.log(r.message)
+        //                 } else {
+        //                     console.log(r)
+        //                 }
+        //             }
+        //         }
+        //     });
+        // });
         
         // Show connection status
         if (frm.doc.access_token) {
