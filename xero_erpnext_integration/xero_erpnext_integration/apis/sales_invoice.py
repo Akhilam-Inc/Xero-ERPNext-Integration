@@ -90,18 +90,21 @@ def create_invoice(doc, method=None):
 def get_customer_contact_id(customer):
     # Method 1: Using frappe.db.sql for more control
     try:
-        contact = frappe.db.sql("""
-            SELECT c.custom_contact_id 
-            FROM `tabContact` c
-            INNER JOIN `tabDynamic Link` dl ON dl.parent = c.name
-            WHERE dl.link_doctype = 'Customer' 
-            AND dl.link_name = %s
-            AND dl.parenttype = 'Contact'
-            LIMIT 1
-        """, (customer,), as_dict=True)
+        dynamic_links = frappe.get_all('Dynamic Link',
+            filters={
+                'link_doctype': 'Customer',
+                'link_name': customer,
+                'parenttype': 'Contact'
+            },
+            fields=['parent'],
+            limit=1
+        )
         
-        if contact:
-            return contact[0].get('custom_contact_id')
+        if dynamic_links:
+            contact_name = dynamic_links[0].parent
+            contact = frappe.get_doc('Contact', contact_name)
+            return contact.get('custom_contact_id')
+        
         return None
     except Exception as e:
         frappe.throw("Error getting contact id for the selected customer")
