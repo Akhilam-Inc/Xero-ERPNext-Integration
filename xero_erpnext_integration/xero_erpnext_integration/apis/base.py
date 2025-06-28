@@ -402,6 +402,7 @@ class XeroAPIClient:
             
         except Exception as e:
             frappe.log_error(f"Failed to log request: {str(e)}", "Xero Request Log")
+            return
 
     def _log_response(self, response):
         """Log API response"""

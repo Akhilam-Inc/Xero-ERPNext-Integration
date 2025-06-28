@@ -24,10 +24,10 @@ function send_payment_to_xero(frm){
                     
                     frappe.show_alert({
                         title: 'Success',
-                        message: 'Payment created successfully in Xero',
+                        message: r.message.message,
                         indicator: 'green'
                     })
-                    frm.set_value("custom_xero_payment_id", r.message.data[0].PaymentID);
+                    frm.set_value("custom_xero_payment_id", r.message.data.PaymentID);
                     frm.set_df_property("custom_xero_payment_id", 'read_only', 1);
                     // frm.save()
                 } else {
