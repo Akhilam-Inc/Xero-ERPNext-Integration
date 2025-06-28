@@ -84,18 +84,24 @@ def create_invoice(doc, method=None):
     except Exception as e:
         frappe.log_error(f"Failed to create contact: {str(e)}", "Xero Create Contact")
         return None
-    
+
+
 @frappe.whitelist()
 def get_customer_contact_id(customer):
-    contact = frappe.get_all('Contact', 
-        filters={
-            'links.link_doctype': 'Customer',
-            'links.link_name': customer
-        },
-        fields=['custom_contact_id'],
-        limit=1
-    )
-    
-    if contact:
-        return contact[0].get('custom_contact_id')
-    return None
+    # Method 1: Using frappe.db.sql for more control
+    try:
+        contact = frappe.db.sql("""
+            SELECT c.custom_contact_id 
+            FROM `tabContact` c
+            INNER JOIN `tabDynamic Link` dl ON dl.parent = c.name
+            WHERE dl.link_doctype = 'Customer' 
+            AND dl.link_name = %s
+            AND dl.parenttype = 'Contact'
+            LIMIT 1
+        """, (customer,), as_dict=True)
+        
+        if contact:
+            return contact[0].get('custom_contact_id')
+        return None
+    except Exception as e:
+        frappe.throw("Error getting contact id for the selected customer")
