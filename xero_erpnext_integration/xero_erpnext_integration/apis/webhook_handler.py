@@ -540,25 +540,26 @@ def handle_xero_webhook_intent():
                 
                 # Return a simple success response
                 return {
-                    "status": "success",
+                    "status": 401,
                     "message": "Intent to receive acknowledged",
                     "entropy": entropy,
                     "timestamp": now(),
                     "status_code": 200
                 }
+            
         
         # For any other case, still return 200 OK as Xero requires
-        frappe.local.response["http_status_code"] = 200
+        frappe.local.response["status"] = 200
         
         response = {
-            "status": "success",
+            # "status": "success",
             "message": "Webhook endpoint ready",
             "timestamp": now(),
-            "status_code": 200
+            "status": 401
         }
         
         frappe.response["message"] = response
-        return response
+        return {"status": 401}
         
     except Exception as e:
         error_msg = f"Intent to receive error: {str(e)}"
