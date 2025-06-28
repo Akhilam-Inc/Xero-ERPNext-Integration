@@ -513,7 +513,7 @@ def handle_xero_webhook_intent():
             "remote_addr": frappe.request.remote_addr,
             "user_agent": frappe.request.headers.get('User-Agent', ''),
             "timestamp": now(),
-            "request": frappe.request
+            "request": frappe.request.headers.get('X-Xero-Signature', '')
         }
         
         # Capture all headers
