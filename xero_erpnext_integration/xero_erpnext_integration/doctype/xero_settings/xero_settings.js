@@ -13,8 +13,19 @@ frappe.ui.form.on('Xero Settings', {
             authorize(frm);
         });
         
-        frm.add_custom_button(__('Sync Pending Invoices'), function() {
-            sync_pending_invoices(frm);
+        frm.add_custom_button(__('Get Invoices'), function() {
+            frappe.call({
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_xero_invoices',
+                callback: function(r) {
+                    if (r.message) {
+                        if (r.message.status === 'success') {
+                           console.log(r.message)
+                        } else {
+                            console.log(r)
+                        }
+                    }
+                }
+            });
         });
         
         // Show connection status
@@ -38,6 +49,7 @@ frappe.ui.form.on('Xero Settings', {
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
+                            window.location.reload()
                             frappe.msgprint({
                                 title: __('Connection Successful'),
                                 message: r.message.message,

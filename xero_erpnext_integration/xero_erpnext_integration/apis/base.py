@@ -244,7 +244,7 @@ class XeroAPIClient:
                 frappe.throw(_("Unsupported HTTP method: {0}").format(method))
             
             # Log response
-            self._log_response(response)
+            # self._log_response(response)
             
             # Handle response
             if response.status_code in [200, 201]:
@@ -392,13 +392,13 @@ class XeroAPIClient:
             log_data = {
                 "doctype": "Xero API Log",
                 "api_method": method,
-                "api_endpoint": url,
-                "request_payload": json.dumps({
+                "api_url": url,
+                "payload": json.dumps({
                     "data": data,
                     "params": params
                 }, indent=2) if (data or params) else "",
                 "timestamp": frappe.utils.now(),
-                "tenant_id": self.tenant_id
+                "response": self.tenant_id
             }
             
             frappe.get_doc(log_data).insert(ignore_permissions=True)
