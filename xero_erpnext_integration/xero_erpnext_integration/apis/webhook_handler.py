@@ -85,7 +85,7 @@ class XeroWebhookHandler:
             
         except Exception as e:
             error_msg = f"Webhook processing failed: {str(e)}"
-            frappe.log_error(error_msg, "Xero Webhook Error")
+            frappe.log_error("Xero Webhook Error", error_msg)
             self._log_webhook("Error", {
                 "error": error_msg, 
                 "payload_type": str(type(payload)),
