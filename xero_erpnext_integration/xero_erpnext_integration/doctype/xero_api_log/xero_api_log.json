@@ -80,14 +80,15 @@
   },
   {
    "fieldname": "headers",
-   "fieldtype": "Data",
-   "label": "headers"
+   "fieldtype": "Code",
+   "label": "headers",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-25 01:35:47.285685",
+ "modified": "2025-06-28 08:17:31.468378",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero API Log",
