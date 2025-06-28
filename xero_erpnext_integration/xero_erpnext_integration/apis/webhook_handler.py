@@ -493,7 +493,6 @@ def handle_xero_webhook():
         return error_response
 
 
-# Intent to receive endpoint - REQUIRED by Xero
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def handle_xero_webhook_intent():
     """
@@ -502,84 +501,189 @@ def handle_xero_webhook_intent():
     URL: /api/method/xero_erpnext_integration.apis.webhook_handler.handle_xero_webhook_intent
     """
     try:
-        # Get the payload from Xero
-        payload = frappe.request.get_data()
-        
-        # Convert bytes to string if needed
-        if isinstance(payload, bytes):
-            payload_str = payload.decode('utf-8')
-        else:
-            payload_str = str(payload) if payload else ""
-        
-        # Parse the JSON payload
-        intent_data = {}
-        if payload_str:
-            try:
-                intent_data = json.loads(payload_str)
-            except json.JSONDecodeError as e:
-                frappe.log_error("Xero Webhook Intent JSON Error", f"Failed to parse intent payload: {str(e)}")
-        
-        # Log the intent request with proper data
-        frappe.log_error("Xero Webhook Intent", f"Intent to receive request: {intent_data}")
-        
-        # Verify this is an intent verification (empty events array with entropy)
-        if isinstance(intent_data, dict):
-            events = intent_data.get("events", [])
-            entropy = intent_data.get("entropy", "")
-            first_sequence = intent_data.get("firstEventSequence")
-            last_sequence = intent_data.get("lastEventSequence")
-            
-            # This is the intent verification pattern from Xero
-            if (isinstance(events, list) and len(events) == 0 and 
-                entropy and first_sequence == 0 and last_sequence == 0):
-                
-                frappe.log_error("Xero Webhook Intent", f"Valid intent verification received with entropy: {entropy}")
-                
-                # # Xero expects a simple 200 OK response for intent verification
-                # frappe.local.response["status_code"] = 200
-                
-                # # Return a simple success response
-                # return {
-                #     "status": 401,
-                #     "message": "Intent to receive acknowledged",
-                #     "entropy": entropy,
-                #     "timestamp": now(),
-                #     "status_code": 200
-                # }
-                return 401
-            
-        
-        # # For any other case, still return 200 OK as Xero requires
-        # frappe.local.response["status"] = 200
-        
-        # response = {
-        #     # "status": "success",
-        #     "message": "Webhook endpoint ready",
-        #     "timestamp": now(),
-        #     "status": 401
-        # }
-        
-        # frappe.response["message"] = response
-        # return {"status": 401}
-        return 401
-        
-    except Exception as e:
-        error_msg = f"Intent to receive error: {str(e)}"
-        frappe.log_error("Xero Webhook Intent Error", error_msg)
-        
-        # Even on error, return 200 OK for Xero webhook setup to succeed
-        frappe.local.response["http_status_code"] = 200
-        
-        response = {
-            "status": "success", 
-            "message": "Webhook endpoint accessible",
-            "error": error_msg,
+        # Capture all request details for analysis
+        request_details = {
+            "method": frappe.request.method,
+            "url": frappe.request.url,
+            "base_url": frappe.request.base_url,
+            "path": frappe.request.path,
+            "query_string": frappe.request.query_string.decode('utf-8') if frappe.request.query_string else "",
+            "content_type": frappe.request.content_type,
+            "content_length": frappe.request.content_length,
+            "remote_addr": frappe.request.remote_addr,
+            "user_agent": frappe.request.headers.get('User-Agent', ''),
             "timestamp": now()
         }
         
-        frappe.response["message"] = response
-        return 401
-
+        # Capture all headers
+        headers = {}
+        for key, value in frappe.request.headers:
+            headers[key] = value
+        request_details["headers"] = headers
+        
+        # Capture query parameters
+        args = {}
+        for key, value in frappe.request.args.items():
+            args[key] = value
+        request_details["query_params"] = args
+        
+        # Capture form data if present
+        form_data = {}
+        try:
+            if frappe.request.form:
+                for key, value in frappe.request.form.items():
+                    form_data[key] = value
+            request_details["form_data"] = form_data
+        except Exception as form_error:
+            request_details["form_data_error"] = str(form_error)
+        
+        # Capture payload using multiple methods
+        payload_info = {}
+        
+        # Method 1: Get raw data
+        try:
+            raw_data = frappe.request.get_data()
+            payload_info["raw_data"] = {
+                "type": str(type(raw_data)),
+                "length": len(raw_data) if raw_data else 0,
+                "content": raw_data.decode('utf-8') if isinstance(raw_data, bytes) else str(raw_data) if raw_data else ""
+            }
+        except Exception as e:
+            payload_info["raw_data_error"] = str(e)
+        
+        # Method 2: Try JSON data
+        try:
+            json_data = frappe.request.get_json()
+            payload_info["json_data"] = {
+                "type": str(type(json_data)),
+                "content": json_data
+            }
+        except Exception as e:
+            payload_info["json_data_error"] = str(e)
+        
+        # Method 3: Try request.data
+        try:
+            request_data = frappe.request.data
+            payload_info["request_data"] = {
+                "type": str(type(request_data)),
+                "length": len(request_data) if request_data else 0,
+                "content": request_data.decode('utf-8') if isinstance(request_data, bytes) else str(request_data) if request_data else ""
+            }
+        except Exception as e:
+            payload_info["request_data_error"] = str(e)
+        
+        request_details["payload_info"] = payload_info
+        
+        # Parse the main payload for Xero-specific data
+        xero_payload = None
+        payload_str = ""
+        
+        # Get the best available payload
+        if payload_info.get("raw_data", {}).get("content"):
+            payload_str = payload_info["raw_data"]["content"]
+        elif payload_info.get("request_data", {}).get("content"):
+            payload_str = payload_info["request_data"]["content"]
+        elif payload_info.get("json_data", {}).get("content"):
+            xero_payload = payload_info["json_data"]["content"]
+            payload_str = json.dumps(xero_payload) if xero_payload else ""
+        
+        # Parse JSON payload if we have a string
+        if payload_str and not xero_payload:
+            try:
+                xero_payload = json.loads(payload_str)
+            except json.JSONDecodeError as e:
+                request_details["json_parse_error"] = str(e)
+        
+        # Analyze Xero-specific payload structure
+        xero_analysis = {}
+        if xero_payload and isinstance(xero_payload, dict):
+            xero_analysis = {
+                "events": xero_payload.get("events", []),
+                "entropy": xero_payload.get("entropy", ""),
+                "firstEventSequence": xero_payload.get("firstEventSequence"),
+                "lastEventSequence": xero_payload.get("lastEventSequence"),
+                "is_intent_verification": False
+            }
+            
+            # Check if this is an intent verification
+            events = xero_payload.get("events", [])
+            entropy = xero_payload.get("entropy", "")
+            first_seq = xero_payload.get("firstEventSequence")
+            last_seq = xero_payload.get("lastEventSequence")
+            
+            if (isinstance(events, list) and len(events) == 0 and 
+                entropy and first_seq == 0 and last_seq == 0):
+                xero_analysis["is_intent_verification"] = True
+        
+        request_details["xero_analysis"] = xero_analysis
+        
+        # Log comprehensive request details
+        frappe.log_error("Xero Webhook Intent - Full Analysis", json.dumps(request_details, indent=2, default=str))
+        
+        # Check for specific Xero webhook signatures
+        xero_signature = headers.get("X-Xero-Signature", "")
+        if xero_signature:
+            request_details["xero_signature_present"] = True
+            frappe.log_error("Xero Webhook Intent - Signature", f"X-Xero-Signature header found: {xero_signature[:20]}...")
+        
+        # Handle different scenarios
+        if xero_analysis.get("is_intent_verification"):
+            frappe.log_error("Xero Webhook Intent - Verification", f"Intent verification detected with entropy: {xero_analysis.get('entropy')}")
+            
+            # Xero expects HTTP 200 for intent verification
+            frappe.local.response["http_status_code"] = 200
+            return {
+                "status": "success",
+                "message": "Intent to receive acknowledged",
+                "entropy": xero_analysis.get("entropy"),
+                "timestamp": now()
+            }
+        
+        elif frappe.request.method == "GET":
+            # Handle GET requests (testing/health check)
+            frappe.local.response["http_status_code"] = 200
+            return {
+                "status": "success",
+                "message": "Webhook endpoint is accessible via GET",
+                "request_details": request_details
+            }
+        
+        else:
+            # Handle other POST requests
+            frappe.local.response["http_status_code"] = 200
+            return {
+                "status": "success",
+                "message": "Webhook endpoint received request",
+                "request_details": request_details
+            }
+        
+    except Exception as e:
+        error_msg = f"Intent to receive error: {str(e)}"
+        error_details = {
+            "error": error_msg,
+            "error_type": str(type(e)),
+            "timestamp": now()
+        }
+        
+        # Try to capture request details even on error
+        try:
+            error_details.update({
+                "method": frappe.request.method,
+                "headers": dict(frappe.request.headers),
+                "content_type": frappe.request.content_type,
+            })
+        except:
+            pass
+        
+        frappe.log_error("Xero Webhook Intent Error - Full Details", json.dumps(error_details, indent=2, default=str))
+        
+        # Return 200 OK even on error for Xero webhook setup to succeed
+        frappe.local.response["http_status_code"] = 200
+        return {
+            "status": "error",
+            "message": "Webhook endpoint accessible but encountered error",
+            "error_details": error_details
+        }
 
 # Manual webhook processing for testing
 @frappe.whitelist()
