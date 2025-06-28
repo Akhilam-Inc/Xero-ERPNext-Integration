@@ -1,5 +1,5 @@
 import frappe
-from .base4 import get_xero_client
+from .base import get_xero_client
 import json
 
 @frappe.whitelist()
@@ -86,3 +86,17 @@ def get_xero_invoices():
             "status": "error",
             "message": str(e)
         }
+
+@frappe.whitelist()
+def authorize():
+    try:
+        client = get_xero_client()
+        response = client.exchange_code_for_token()
+
+        return {
+            "status": "success",
+            "message": "Authorization successful",
+            "data": response
+        }
+    except Exception as e:
+        frappe.log_error("Authorization Error", str(e))

@@ -25,12 +25,37 @@ frappe.ui.form.on('Xero Settings', {
         }
     },
 	before_save: function(frm) {
-		if(frm.doc.enable){
-			test_xero_connection(frm);
-		}
-		else{
-			frappe.show_alert("Please enable the integration to test the connection.");
-		}
+		// if(frm.doc.enable){
+		// 	test_xero_connection(frm);
+		// }
+		// else{
+		// 	frappe.show_alert("Please enable the integration to test the connection.");
+		// }
+
+        if(frm.doc.code && frm.doc.scope){
+            frappe.call({
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
+                callback: function(r) {
+                    if (r.message) {
+                        if (r.message.status === 'success') {
+                            frappe.msgprint({
+                                title: __('Connection Successful'),
+                                message: r.message.message,
+                                indicator: 'green'
+                            });
+                            frm.set_value("enable", 1)
+                        } else {
+                            frm.set_value("enable", 0)
+                            frappe.msgprint({
+                                title: __('Connection Failed'),
+                                message: r.message.message,
+                                indicator: 'red'
+                            });
+                        }
+                    }
+                }
+            });
+        }
 		
 	}
 });

@@ -24,12 +24,12 @@ class XeroAPIClient:
         self.settings = frappe.get_single("Xero Settings")
         self.base_url = "https://api.xero.com/api.xro/2.0"
         self.auth_url = "https://login.xero.com/identity/connect/authorize"
-        self.token_url = "https://identity.xero.com/connect/token"
+        self.token_url = self.settings.access_token_url
         self.connections_url = "https://api.xero.com/connections"
         
         # OAuth 2.0 settings
         self.client_id = self.settings.client_id
-        self.client_secret = self.settings.get_password("client_secret")
+        self.client_secret = self.settings.client_secret
         self.redirect_uri = self.settings.redirect_uri
         self.scope = "accounting.transactions accounting.contacts accounting.settings offline_access"
         
@@ -77,7 +77,7 @@ class XeroAPIClient:
             # Prepare token request
             token_data = {
                 "grant_type": "authorization_code",
-                "client_id": self.client_id,
+                # "client_id": self.client_id,
                 "code": code,
                 "redirect_uri": self.redirect_uri
             }
@@ -101,7 +101,7 @@ class XeroAPIClient:
                 # Save tokens to settings
                 self.settings.access_token = token_data.get("access_token")
                 self.settings.refresh_token = token_data.get("refresh_token")
-                self.settings.scope = token_data.get("scope")
+                # self.settings.scope = token_data.get("scope")
                 
                 # Calculate expiry time
                 expires_in = token_data.get("expires_in", 1800)  # Default 30 minutes
@@ -128,7 +128,7 @@ class XeroAPIClient:
         """Get tenant information and save to settings"""
         try:
             # Update headers with new access token
-            self.access_token = self.settings.get_password("access_token")
+            self.access_token = self.settings.access_token
             self.headers["Authorization"] = f"Bearer {self.access_token}"
             
             # Get connections (tenants)
