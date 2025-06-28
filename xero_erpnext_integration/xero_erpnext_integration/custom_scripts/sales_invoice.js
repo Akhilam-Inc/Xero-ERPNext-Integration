@@ -70,8 +70,8 @@ function send_invoice_to_xero(frm){
                         message: 'Invoice created successfully in Xero',
                         indicator: 'green'
                     })
-                    // frm.set_value("custom_contact_id", r.message.data[0].ContactID);
-                    // frm.set_df_property("custom_send_to_xero", 'read_only', 1);
+                    frm.set_value("custom_xero_invoice_number", r.message.data[0].InvoiceID);
+                    frm.set_df_property("custom_xero_invoice_number", 'read_only', 1);
                     // frm.save()
                 } else {
                     frappe.show_alert({

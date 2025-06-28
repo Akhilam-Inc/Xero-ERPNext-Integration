@@ -98,8 +98,8 @@ def create_invoice(doc, method=None):
             xero_invoice = response["Invoices"][0]
             
             # Update ERPNext Sales Invoice with Xero Invoice ID
-            frappe.db.set_value("Sales Invoice", invoice.name, "custom_xero_invoice_number", xero_invoice.get("InvoiceID"))
-            frappe.db.commit()
+            # frappe.db.set_value("Sales Invoice", invoice.name, "custom_xero_invoice_number", xero_invoice.get("InvoiceID"))
+            # frappe.db.commit()
             
             return {
                 "status": "success",
