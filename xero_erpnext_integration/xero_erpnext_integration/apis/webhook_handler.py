@@ -48,7 +48,7 @@ class XeroWebhookHandler:
             # Verify webhook signature if webhook secret is configured
             if self.settings.webhook_secret and signature:
                 if not self._verify_signature(payload_str, signature):
-                    frappe.throw(_("Invalid webhook signature"), frappe.AuthenticationError)
+                    return {"status": "error", "message": "Invalid webhook signature"}
             
             # Parse webhook payload
             try:
@@ -437,13 +437,12 @@ def handle_xero_webhook():
         result = handler.process_webhook(payload, signature)
 
         # If signature is invalid, return 401 explicitly
+        result = handler.process_webhook(payload, signature)
+
         if result.get("message") == "Invalid webhook signature":
             frappe.local.response["http_status_code"] = 401
             return result
 
-        frappe.response["message"] = result
-        frappe.response["http_status_code"] = 200 if result.get("status") == "success" else 400
-        return result
 
         
     except Exception as e:
