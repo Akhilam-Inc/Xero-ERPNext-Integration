@@ -45,14 +45,14 @@ def create_contact(doc, method=None):
             "FirstName": contact.first_name or "",
             "LastName": contact.last_name or "",
             "EmailAddress": contact.email_id or "",
-            "AccountNumber": contact.custom_account_numner,
+            "AccountNumber": contact.custom_account_number,
             "Name": contact.company_name or "",
             "IsCustomer": True if contact.custom_is_customer == 1 else False,
             "IsSupplier": True if contact.custom_is_supplier == 1 else False,
             "Addresses": [
                 {
                     "AddressType": "STREET",
-                    "AddressLine1": contact.address,
+                    "AddressLine1": contact.address or "",
                     # "City": contact.city,
                     # "Region": contact.state,
                     # "PostalCode": contact.postal_code,
