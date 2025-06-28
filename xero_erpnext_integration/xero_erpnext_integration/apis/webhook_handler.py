@@ -435,12 +435,16 @@ def handle_xero_webhook():
         # Process webhook
         handler = XeroWebhookHandler()
         result = handler.process_webhook(payload, signature)
-        
-        # Return response
+
+        # If signature is invalid, return 401 explicitly
+        if result.get("message") == "Invalid webhook signature":
+            frappe.local.response["http_status_code"] = 401
+            return result
+
         frappe.response["message"] = result
         frappe.response["http_status_code"] = 200 if result.get("status") == "success" else 400
-        
         return result
+
         
     except Exception as e:
         error_msg = f"Webhook endpoint error: {str(e)}"
