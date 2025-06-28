@@ -356,7 +356,6 @@ def handle_xero_webhook():
     try:
         # Get request data
         payload = frappe.request.get_data()
-        signature = frappe.request.
         signature = frappe.request.headers.get("X-Xero-Signature")
         
         # Process webhook
