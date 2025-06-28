@@ -42,48 +42,82 @@ def get_invoice(invoice_id):
 
 @frappe.whitelist() 
 def create_invoice(doc, method=None):
-    """Create contact in Xero"""
+    """Create invoice in Xero"""
     try:
         client = get_xero_client()
-        contact = frappe.get_doc("Sales Invoice", doc)
-        contact_data = {
-            "FirstName": contact.first_name or "",
-            "LastName": contact.last_name or "",
-            "EmailAddress": contact.email_id or "",
-            "AccountNumber": contact.custom_account_number,
-            "Name": contact.company_name or "",
-            "IsCustomer": True if contact.custom_is_customer == 1 else False,
-            "IsSupplier": True if contact.custom_is_supplier == 1 else False,
-            "Addresses": [
-                {
-                    "AddressType": "STREET",
-                    "AddressLine1": contact.address or "",
-                    # "City": contact.city,
-                    # "Region": contact.state,
-                    # "PostalCode": contact.postal_code,
-                    # "Country": contact.country
-                }
-            ],
-            "Phones": [
-                {
-                    "PhoneType": "DEFAULT",
-                    "PhoneNumber": contact.phone or contact.mobile_no or ""
-                }
-            ]
-        }
-        data = {"Contacts": [contact_data]}
-        response = client.make_request("POST", "/Contacts", data=data)
         
-        if response:
+        # Get the Sales Invoice document
+        if isinstance(doc, str):
+            invoice = frappe.get_doc("Sales Invoice", doc)
+        else:
+            invoice = doc
+        
+        # Get customer contact ID from Xero
+        contact_id = get_customer_contact_id(invoice.customer)
+        if not contact_id:
+            frappe.throw(f"No Xero contact ID found for customer: {invoice.customer}")
+        
+        # Prepare line items
+        line_items = []
+        for item in invoice.items:
+            line_item = {
+                "Description": item.description or item.item_name,
+                "Quantity": str(item.qty),
+                "UnitAmount": str(item.rate),
+                "AccountCode": item.get("custom_account_code") or "200",  # Default to 200 if not set
+            }
+            
+            # Add discount rate if available
+            if item.get("discount_percentage"):
+                line_item["DiscountRate"] = str(item.discount_percentage)
+            
+            line_items.append(line_item)
+        
+        # Prepare invoice data
+        invoice_data = {
+            "Type": "ACCREC",  # Accounts Receivable
+            "Contact": {
+                "ContactID": contact_id
+            },
+            "DateString": invoice.posting_date.strftime("%Y-%m-%d") if invoice.posting_date else None,
+            "DueDateString": invoice.due_date.strftime("%Y-%m-%d") if invoice.due_date else None,
+            "LineAmountTypes": "Exclusive",  # Tax exclusive
+            "LineItems": line_items,
+            "Reference": invoice.name,  # ERPNext invoice reference
+            "Status": "AUTHORISED"  # Create as draft initially
+        }
+        
+        # Add currency if different from base currency
+        if invoice.currency and invoice.currency != frappe.get_cached_value("Company", invoice.company, "default_currency"):
+            invoice_data["CurrencyCode"] = invoice.currency
+        
+        data = {"Invoices": [invoice_data]}
+        response = client.make_request("POST", "/Invoices", data=data)
+        
+        if response and "Invoices" in response:
+            xero_invoice = response["Invoices"][0]
+            
+            # Update ERPNext Sales Invoice with Xero Invoice ID
+            frappe.db.set_value("Sales Invoice", invoice.name, "custom_xero_invoice_number", xero_invoice.get("InvoiceID"))
+            frappe.db.commit()
+            
             return {
                 "status": "success",
-                "data": response.get("Contacts", [])
+                "data": xero_invoice,
+                "message": f"Invoice created in Xero with ID: {xero_invoice.get('InvoiceID')}"
             }
-        return None
+        
+        return {
+            "status": "error",
+            "message": "Failed to create invoice in Xero"
+        }
         
     except Exception as e:
-        frappe.log_error(f"Failed to create contact: {str(e)}", "Xero Create Contact")
-        return None
+        frappe.log_error(f"Failed to create invoice in Xero: {str(e)}", "Xero Create Invoice")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
 @frappe.whitelist()
