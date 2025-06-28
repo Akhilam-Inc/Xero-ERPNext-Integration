@@ -494,7 +494,7 @@ def handle_xero_webhook():
 
 
 # Intent to receive endpoint - REQUIRED by Xero
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def handle_xero_webhook_intent():
     """
     Handle Xero webhook intent to receive verification
@@ -503,7 +503,7 @@ def handle_xero_webhook_intent():
     """
     try:
         # Log the intent request
-        frappe.log_error("Xero Webhook Intent", f"Intent to receive request received at {now()}")
+        frappe.log_error("Xero Webhook Intent", f"Intent to receive request received at {frappe.request.get_data()}")
         
         # Xero expects a simple 200 OK response
         frappe.local.response["http_status_code"] = 200
