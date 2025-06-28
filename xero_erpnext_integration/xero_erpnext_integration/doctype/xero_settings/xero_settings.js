@@ -49,7 +49,7 @@ frappe.ui.form.on('Xero Settings', {
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
-                            window.location.reload()
+                            // window.location.reload()
                             frappe.msgprint({
                                 title: __('Connection Successful'),
                                 message: r.message.message,
