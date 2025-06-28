@@ -85,7 +85,7 @@ class XeroBaseClient:
             
             data = {
                 "grant_type": "client_credentials",
-                "scope": "app.connections"
+                "scope": ["app.connections"]
             }
             
             # Get fresh settings for debug mode check

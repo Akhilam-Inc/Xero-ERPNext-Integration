@@ -3,7 +3,9 @@ frappe.ui.form.on('Xero Settings', {
 		const urlParams = new URLSearchParams(window.location.search);
 		const code = urlParams.get('code');
 		if (code) {
-			console.log(code)
+			frm.set_value("code", code)
+            frm.set_value("scope", urlParams.get('scope'))
+			frm.save()
 		}
         // Add custom buttons
         
