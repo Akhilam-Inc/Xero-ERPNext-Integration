@@ -512,7 +512,8 @@ def handle_xero_webhook_intent():
             "content_length": frappe.request.content_length,
             "remote_addr": frappe.request.remote_addr,
             "user_agent": frappe.request.headers.get('User-Agent', ''),
-            "timestamp": now()
+            "timestamp": now(),
+            "request": frappe.request
         }
         
         # Capture all headers
@@ -684,6 +685,8 @@ def handle_xero_webhook_intent():
             "message": "Webhook endpoint accessible but encountered error",
             "error_details": error_details
         }
+
+
 
 # Manual webhook processing for testing
 @frappe.whitelist()
