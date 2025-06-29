@@ -8,7 +8,7 @@ import json
 from frappe import _
 
 # Replace with your webhook key from Xero Developer App
-WEBHOOK_KEY = frappe.db.get_single_value("Xero Settings", "atOdStIWY8CD1qGnqvEYlbD03IDFwZKsA8iFiU7vA3kbe78Gt8gyv5rxXPN7rhBYY32xhYvtFSuBdiTdtaBQoA==")
+WEBHOOK_KEY = frappe.db.get_single_value("Xero Settings", "webhook_secret")
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
