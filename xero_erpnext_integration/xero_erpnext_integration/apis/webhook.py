@@ -8,17 +8,18 @@ import json
 from frappe import _
 
 # Replace with your webhook key from Xero Developer App
-settings = frappe.get_single("Xero Settings")
-WEBHOOK_KEY = settings.webhook_secret
+
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
     try:
+        settings = frappe.get_single("Xero Settings")
+        WEBHOOK_KEY = settings.webhook_secret
         request = frappe.request
         payload = request.get_data()
         signature = request.headers.get("X-Xero-Signature")
 
-        if not is_valid_signature(payload, signature):
+        if not is_valid_signature(payload, signature, WEBHOOK_KEY):
             frappe.log_error("Invalid Xero Webhook Signature", "Xero Webhook")
             frappe.response['http_status_code'] = 400
             return "Invalid signature"
@@ -34,7 +35,7 @@ def handle_webhook():
         frappe.response['http_status_code'] = 500
         return f"Internal error: {e}"
 
-def is_valid_signature(payload, signature):
+def is_valid_signature(payload, signature, WEBHOOK_KEY):
     digest = hmac.new(
         key=WEBHOOK_KEY.encode("utf-8"),
         msg=payload,
