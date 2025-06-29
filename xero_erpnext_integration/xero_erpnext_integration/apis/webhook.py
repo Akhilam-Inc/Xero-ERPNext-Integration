@@ -16,19 +16,19 @@ def handle_webhook():
         settings = frappe.get_single("Xero Settings")
         WEBHOOK_KEY = settings.webhook_secret
         request = frappe.request
-        payload = request.get_data()
+        payload = request.get('body')
         signature = request.headers.get("X-Xero-Signature")
 
         if not is_valid_signature(payload, signature, WEBHOOK_KEY):
-            frappe.log_error("Invalid Xero Webhook Signature", f"Xero Webhook: \n Paylad :{payload} \n Signature :{signature}")
-            frappe.response['http_status_code'] = 400
-            return "Invalid signature"
+            frappe.log_error("Invalid Xero Webhook Signature", f"Xero Webhook: \n Paylad :{frappe.request} \n Signature :{signature}")
+            frappe.response['http_status_code'] = 401
+            return { "statusCode": 401 }
 
         data = json.loads(payload)
         # frappe.enqueue("xero_erpnext_integration.xero_erpnext_integration.apis.webhook.process_events", queue='long', job_name='Process Xero Webhook', data=data)
 
         frappe.response['http_status_code'] = 200
-        return "Webhook received"
+        return { "statusCode": 200 }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Xero Webhook Error")
