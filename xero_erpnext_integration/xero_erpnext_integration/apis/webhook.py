@@ -20,7 +20,7 @@ def handle_webhook():
         signature = request.headers.get("X-Xero-Signature")
 
         if not is_valid_signature(payload, signature, WEBHOOK_KEY):
-            frappe.log_error("Invalid Xero Webhook Signature", f"Xero Webhook: \n Paylad :{frappe.request} \n Signature :{signature}")
+            frappe.log_error("Invalid Xero Webhook Signature", f"Xero Webhook: \n Payload :{json.loads(frappe.request)} \n Signature :{signature}")
             frappe.response['http_status_code'] = 401
             return { "statusCode": 401 }
 
@@ -40,7 +40,7 @@ def is_valid_signature(payload, signature, WEBHOOK_KEY):
 
     digest = hmac.new(
         key=WEBHOOK_KEY.encode("utf-8"),
-        msg=payload,
+        msg=bytes(payload, 'utf-8'),
         digestmod=hashlib.sha256
     ).digest()
 
@@ -51,7 +51,6 @@ def is_valid_signature(payload, signature, WEBHOOK_KEY):
     if not signature:
         return False
 
-    
     return hmac.compare_digest(expected_signature, signature)
 
 
