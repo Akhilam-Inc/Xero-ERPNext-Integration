@@ -16,7 +16,7 @@ def handle_webhook():
         settings = frappe.get_single("Xero Settings")
         WEBHOOK_KEY = settings.webhook_secret
         request = frappe.request
-        payload = request.get('body')
+        payload = request.get_data()
         signature = request.headers.get("X-Xero-Signature")
 
         if not is_valid_signature(payload, signature, WEBHOOK_KEY):
