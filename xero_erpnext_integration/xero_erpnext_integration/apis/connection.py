@@ -51,41 +51,7 @@ def get_organisation_details():
             "message": str(e)
         }
 
-@frappe.whitelist()
-def get_xero_contacts():
-    """Get all Xero contacts"""
-    try:
-        client = get_xero_client()
-        response = client.make_request("GET", "/Contacts")
-        
-        return {
-            "status": "success",
-            "data": response.get("Contacts", [])
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
-@frappe.whitelist()
-def get_xero_invoices():
-    """Get Xero invoices"""
-    try:
-        client = get_xero_client()
-        response = client.make_request("GET", "/Invoices")
-        
-        return {
-            "status": "success",
-            "data": response.get("Invoices", [])
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
 @frappe.whitelist()
 def authorize():
