@@ -23,7 +23,7 @@ def handle_webhook():
             return "Invalid signature"
 
         data = json.loads(payload)
-        frappe.enqueue("your_app.api.xero_webhook.process_events", queue='long', job_name='Process Xero Webhook', data=data)
+        frappe.enqueue("xero_erpnext_integration.xero_erpnext_integration.apis.webhook.process_events", queue='long', job_name='Process Xero Webhook', data=data)
 
         frappe.response['http_status_code'] = 200
         return "Webhook received"
