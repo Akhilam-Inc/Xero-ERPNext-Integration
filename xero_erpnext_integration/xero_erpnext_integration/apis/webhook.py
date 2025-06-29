@@ -30,7 +30,7 @@ def handle_webhook():
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Xero Webhook Error")
-        frappe.response['http_status_code'] = 500
+        frappe.response['http_status_code'] = 200
         return f"Internal error: {e}"
 
 def is_valid_signature(payload, signature):
