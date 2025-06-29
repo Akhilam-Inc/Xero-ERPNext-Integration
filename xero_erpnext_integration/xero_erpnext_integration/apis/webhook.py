@@ -22,4 +22,4 @@ def handle_webhook():
     signature = frappe.request.headers.get("X-Xero-Signature")
     payload = frappe.request.get_data()
     
-    return True
+    return {"http_status_code": 200, "body": "Webhook processed"}
