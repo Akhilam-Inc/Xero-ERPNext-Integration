@@ -1,25 +1,59 @@
+# your_app/api/xero_webhook.py
+
 import frappe
-from frappe import _
-from frappe.utils import now, flt, getdate, nowdate
-import json
 import hmac
 import hashlib
 import base64
-from .base import get_xero_client
+import json
+from frappe import _
 
-
+# Replace with your webhook key from Xero Developer App
+WEBHOOK_KEY = frappe.db.get_single_value("Xero Settings", "atOdStIWY8CD1qGnqvEYlbD03IDFwZKsA8iFiU7vA3kbe78Gt8gyv5rxXPN7rhBYY32xhYvtFSuBdiTdtaBQoA==")
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
-    """
-    Handle incoming webhooks from Xero
-    Process payment updates and sync back to ERPNext
-    """
-    xero_client = get_xero_client()
-    settings = frappe.get_single("Xero Settings")
-    
-    # Verify webhook signature
-    signature = frappe.request.headers.get("X-Xero-Signature")
-    payload = frappe.request.get_data()
-    
-    return {"http_status_code": 200, "body": "Webhook processed"}
+    try:
+        request = frappe.request
+        payload = request.get_data()
+        signature = request.headers.get("X-Xero-Signature")
+
+        if not is_valid_signature(payload, signature):
+            frappe.log_error("Invalid Xero Webhook Signature", "Xero Webhook")
+            frappe.response['http_status_code'] = 400
+            return "Invalid signature"
+
+        data = json.loads(payload)
+        frappe.enqueue("your_app.api.xero_webhook.process_events", queue='long', job_name='Process Xero Webhook', data=data)
+
+        frappe.response['http_status_code'] = 200
+        return "Webhook received"
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Xero Webhook Error")
+        frappe.response['http_status_code'] = 500
+        return "Internal error"
+
+def is_valid_signature(payload, signature):
+    digest = hmac.new(
+        key=WEBHOOK_KEY.encode("utf-8"),
+        msg=payload,
+        digestmod=hashlib.sha256
+    ).digest()
+    expected_signature = base64.b64encode(digest).decode()
+    return hmac.compare_digest(expected_signature, signature)
+
+def process_events(data):
+    events = data.get("events", [])
+    for event in events:
+        tenant_id = event.get("tenantId")
+        event_type = event.get("eventType")
+        event_category = event.get("eventCategory")
+        resource_id = event.get("resourceId")
+
+        # Handle event
+        frappe.log_error("Xero Wwbhook Event", f"Xero Webhook Event: {event_type} - {event_category} - {resource_id}")
+
+        # You can also sync specific invoice/payment, e.g.:
+        # from .sync import sync_invoice_from_xero
+        # if event_category == "INVOICE":
+        #     sync_invoice_from_xero(resource_id, tenant_id)
