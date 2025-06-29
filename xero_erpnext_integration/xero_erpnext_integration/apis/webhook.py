@@ -20,7 +20,7 @@ def handle_webhook():
         signature = request.headers.get("X-Xero-Signature")
 
         if not is_valid_signature(payload, signature, WEBHOOK_KEY):
-            frappe.log_error("Invalid Xero Webhook Signature", "Xero Webhook")
+            frappe.log_error("Invalid Xero Webhook Signature", f"Xero Webhook: \n Paylad :{payload} \n Signature :{signature}")
             frappe.response['http_status_code'] = 400
             return "Invalid signature"
 
@@ -36,13 +36,18 @@ def handle_webhook():
         return f"Internal error: {e}"
 
 def is_valid_signature(payload, signature, WEBHOOK_KEY):
+    if not signature:
+        return False
+
     digest = hmac.new(
-        key="atOdStIWY8CD1qGnqvEYlbD03IDFwZKsA8iFiU7vA3kbe78Gt8gyv5rxXPN7rhBYY32xhYvtFSuBdiTdtaBQoA==".encode("utf-8"),
+        key=WEBHOOK_KEY.encode("utf-8"),
         msg=payload,
         digestmod=hashlib.sha256
     ).digest()
+
     expected_signature = base64.b64encode(digest).decode()
     return hmac.compare_digest(expected_signature, signature)
+
 
 def process_events(data):
     events = data.get("events", [])
