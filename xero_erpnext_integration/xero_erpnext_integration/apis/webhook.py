@@ -37,7 +37,7 @@ def handle_webhook():
 
 def is_valid_signature(payload, signature, WEBHOOK_KEY):
     digest = hmac.new(
-        key=WEBHOOK_KEY.encode("utf-8"),
+        key="atOdStIWY8CD1qGnqvEYlbD03IDFwZKsA8iFiU7vA3kbe78Gt8gyv5rxXPN7rhBYY32xhYvtFSuBdiTdtaBQoA==".encode("utf-8"),
         msg=payload,
         digestmod=hashlib.sha256
     ).digest()
