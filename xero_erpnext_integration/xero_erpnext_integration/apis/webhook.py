@@ -36,8 +36,7 @@ def handle_webhook():
         return f"Internal error: {e}"
 
 def is_valid_signature(payload, signature, WEBHOOK_KEY):
-    if not signature:
-        return False
+    
 
     digest = hmac.new(
         key=WEBHOOK_KEY.encode("utf-8"),
@@ -46,6 +45,13 @@ def is_valid_signature(payload, signature, WEBHOOK_KEY):
     ).digest()
 
     expected_signature = base64.b64encode(digest).decode()
+
+    frappe.log_error("Xero Webhook Signature", f"Expected Signature: {expected_signature} \n Signature: {signature}")
+
+    if not signature:
+        return False
+
+    
     return hmac.compare_digest(expected_signature, signature)
 
 
