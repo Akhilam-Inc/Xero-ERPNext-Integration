@@ -11,10 +11,18 @@ today_date_param = f"/Date({today_ms}+0000)/"
 
 @frappe.whitelist()
 def get_specific_invoices():
+    unpaid_invoices = frappe.get_all("Sales Invoice", 
+        filters={
+            "custom_xero_invoice_number": ["is", "set"],
+            "status": ["==", "Unpaid"]
+        },
+        fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number"]
+    )
+    invoice_names = ",".join([invoice.custom_xero_invoice_number for invoice in unpaid_invoices]) if unpaid_invoices else ""
     #   /invoices?Statuses=AUTHORISED,PAID&ContactIDs=3138017f-8ddc-420e-a159-e7e1cf9e643d,4b2df4a1-7aa5-4ce3-9e9c-3c55794c5283
     try:
         client = get_xero_client()
-        response = client.make_request("GET", f"/invoices?Statuses=PAID&Date={today}&summaryOnly=True")
+        response = client.make_request("GET", f"/invoices?Statuses=PAID&IDs={invoice_names}&summaryOnly=True")
         
         return {
             "status": "success",
