@@ -8,7 +8,7 @@ def get_specific_invoices():
     #   /invoices?Statuses=AUTHORISED,PAID&ContactIDs=3138017f-8ddc-420e-a159-e7e1cf9e643d,4b2df4a1-7aa5-4ce3-9e9c-3c55794c5283
     try:
         client = get_xero_client()
-        response = client.make_request("GET", "/invoices?Statuses=AUTHORISED,PAID")
+        response = client.make_request("GET", "/invoices?Statuses=PAID")
         
         return {
             "status": "success",
