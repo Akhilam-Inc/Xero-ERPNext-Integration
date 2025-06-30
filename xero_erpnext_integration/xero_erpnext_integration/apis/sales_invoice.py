@@ -103,7 +103,7 @@ def sync_invoice_payments():
         }
         
     except Exception as e:
-        frappe.log_error(f"Error syncing invoice payments: {str(e)}", "Xero Payment Sync")
+        frappe.log_error("Xero Payment Sync", f"Error syncing invoice payments: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
@@ -199,7 +199,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         }
         
     except Exception as e:
-        frappe.log_error(f"Error creating payment entry: {str(e)}", "Xero Payment Entry Creation")
+        frappe.log_error("Xero Payment Entry Creation", f"Error creating payment entry: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
@@ -245,7 +245,7 @@ def check_invoice_payment_status(sales_invoice_name):
         }
         
     except Exception as e:
-        frappe.log_error(f"Error checking payment status: {str(e)}", "Xero Payment Status Check")
+        frappe.log_error("Xero Payment Status Check", f"Error checking payment status: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
@@ -285,7 +285,7 @@ def get_invoice(invoice_id):
             return None
             
         except Exception as e:
-            frappe.log_error(f"Failed to get invoice: {str(e)}", "Xero Get Invoice")
+            frappe.log_error("Xero Get Invoice", f"Failed to get invoice: {str(e)}")
             return None
 
 
