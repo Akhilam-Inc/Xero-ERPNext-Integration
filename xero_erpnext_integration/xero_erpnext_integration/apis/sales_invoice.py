@@ -165,6 +165,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         payment_entry.payment_type = "Receive"
         payment_entry.party_type = "Customer"
         payment_entry.party = sales_invoice.customer
+        payment_entry.mode_of_payment = "Cash"
         payment_entry.company = sales_invoice.company
         payment_entry.posting_date = payment_date
         payment_entry.paid_amount = remaining_amount
@@ -176,10 +177,10 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         # Set accounts
         company_doc = frappe.get_doc("Company", sales_invoice.company)
         payment_entry.paid_to = company_doc.default_cash_account or company_doc.default_bank_account
-        payment_entry.paid_from = company_doc.default_bank_account or frappe.get_value("Customer", sales_invoice.customer, "default_receivable_account")
+        # payment_entry.paid_from = company_doc.default_bank_account or frappe.get_value("Customer", sales_invoice.customer, "default_receivable_account")
         
-        if not payment_entry.paid_from:
-            payment_entry.paid_from = company_doc.default_receivable_account
+        # if not payment_entry.paid_from:
+        #     payment_entry.paid_from = company_doc.default_receivable_account
         
         # Add reference to the Sales Invoice
         payment_entry.append("references", {
