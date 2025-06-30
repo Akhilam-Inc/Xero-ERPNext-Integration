@@ -14,7 +14,7 @@ def get_specific_invoices():
     unpaid_invoices = frappe.get_all("Sales Invoice", 
         filters={
             "custom_xero_invoice_number": ["is", "set"],
-            "status": ["==", "Unpaid"]
+            "status": ["=", "Unpaid"]
         },
         fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number"]
     )
