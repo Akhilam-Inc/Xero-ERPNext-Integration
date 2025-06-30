@@ -31,7 +31,7 @@ frappe.ui.form.on('Xero Settings', {
 
         frm.add_custom_button(__('Sync Paid Invoices'), function() {
             frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_specific_invoices',
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments',
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
