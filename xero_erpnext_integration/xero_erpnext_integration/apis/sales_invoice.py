@@ -1,14 +1,19 @@
 import frappe
 from .base import get_xero_client
 import json
+import time
+from datetime import datetime
 
+today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+today_ms = int(today.timestamp() * 1000)
+today_date_param = f"/Date({today_ms}+0000)/"
 
 @frappe.whitelist()
 def get_specific_invoices():
     #   /invoices?Statuses=AUTHORISED,PAID&ContactIDs=3138017f-8ddc-420e-a159-e7e1cf9e643d,4b2df4a1-7aa5-4ce3-9e9c-3c55794c5283
     try:
         client = get_xero_client()
-        response = client.make_request("GET", "/invoices?Statuses=PAID")
+        response = client.make_request("GET", f"/invoices?Statuses=PAID&Date={today_date_param}&summaryOnly=True")
         
         return {
             "status": "success",
