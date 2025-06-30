@@ -176,7 +176,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         # Set accounts
         company_doc = frappe.get_doc("Company", sales_invoice.company)
         payment_entry.paid_to = company_doc.default_cash_account or company_doc.default_bank_account
-        payment_entry.paid_from = frappe.get_value("Customer", sales_invoice.customer, "default_receivable_account")
+        payment_entry.paid_from = company_doc.default_bank_account or frappe.get_value("Customer", sales_invoice.customer, "default_receivable_account")
         
         if not payment_entry.paid_from:
             payment_entry.paid_from = company_doc.default_receivable_account
