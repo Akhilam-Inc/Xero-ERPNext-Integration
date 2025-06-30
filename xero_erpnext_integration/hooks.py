@@ -52,6 +52,14 @@ doctype_js = {
 override_whitelisted_methods = {
     "/api/method/xero_webhook": "xero_erpnext_integration.xero_erpnext_integration.apis.webhook.handle_webhook"
 }
+
+scheduler_events = {
+    "cron": {
+		"0 */2 * * *":  [
+			"xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments"
+		]
+	},
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
