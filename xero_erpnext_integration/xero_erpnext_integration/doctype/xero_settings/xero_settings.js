@@ -29,20 +29,20 @@ frappe.ui.form.on('Xero Settings', {
             });
         });
 
-        // frm.add_custom_button(__('Get Contacts'), function() {
-        //     frappe.call({
-        //         method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_xero_contacts',
-        //         callback: function(r) {
-        //             if (r.message) {
-        //                 if (r.message.status === 'success') {
-        //                    console.log(r.message)
-        //                 } else {
-        //                     console.log(r)
-        //                 }
-        //             }
-        //         }
-        //     });
-        // });
+        frm.add_custom_button(__('Sync Paid Invoices'), function() {
+            frappe.call({
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_specific_invoices',
+                callback: function(r) {
+                    if (r.message) {
+                        if (r.message.status === 'success') {
+                           console.log(r.message)
+                        } else {
+                            console.log(r)
+                        }
+                    }
+                }
+            });
+        });
         
         // Show connection status
         if (frm.doc.access_token) {
