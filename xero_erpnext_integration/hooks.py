@@ -60,6 +60,14 @@ scheduler_events = {
 		]
 	},
 }
+
+# Document Events
+doc_events = {
+    "Contact": {
+        "on_update": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.contact.on_update"
+    }
+}
+
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
