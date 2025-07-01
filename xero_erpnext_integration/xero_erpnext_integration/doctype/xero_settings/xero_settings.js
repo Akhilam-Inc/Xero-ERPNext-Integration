@@ -20,9 +20,9 @@ frappe.ui.form.on('Xero Settings', {
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
-                           console.log(r.message)
+                           frappe.show_alert("Webhook Tested Successfully", 5)
                         } else {
-                            console.log(r)
+                            frappe.show_alert("Error Testing Webhook", 5)
                         }
                     }
                 }
@@ -35,9 +35,9 @@ frappe.ui.form.on('Xero Settings', {
                 callback: function(r) {
                     if (r.message) {
                         if (r.message.status === 'success') {
-                           console.log(r.message)
+                           frappe.show_alert("Paid Invoices Synced Successfully", 5)
                         } else {
-                            console.log(r)
+                            frappe.show_alert("Error Syncing Paid Invoices", 5)
                         }
                     }
                 }
