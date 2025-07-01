@@ -56,7 +56,7 @@ override_whitelisted_methods = {
 scheduler_events = {
     "cron": {
 		"0 */2 * * *":  [
-			"xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments"
+			"xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments"
 		]
 	},
 }
