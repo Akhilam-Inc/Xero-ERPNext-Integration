@@ -42,11 +42,11 @@ def create_contact(doc, method=None):
         client = get_xero_client()
         contact = frappe.get_doc("Contact", doc)
         contact_data = {
+            "Name": contact.name,
             "FirstName": contact.first_name or "",
             "LastName": contact.last_name or "",
             "EmailAddress": contact.email_id or "",
-            "AccountNumber": contact.custom_account_number,
-            "Name": contact.company_name or "",
+            "AccountNumber": contact.name,
             "IsCustomer": True if contact.custom_is_customer == 1 else False,
             "IsSupplier": True if contact.custom_is_supplier == 1 else False,
             "Addresses": [

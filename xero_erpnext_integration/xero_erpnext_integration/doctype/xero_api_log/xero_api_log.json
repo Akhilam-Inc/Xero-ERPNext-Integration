@@ -59,7 +59,7 @@
   },
   {
    "fieldname": "api_url",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "API URL",
    "read_only": 1
@@ -88,7 +88,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-28 08:17:31.468378",
+ "modified": "2025-07-20 23:07:31.463620",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero API Log",

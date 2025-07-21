@@ -1,47 +1,74 @@
 frappe.ui.form.on('Sales Invoice', {
     refresh(frm) {
-        console.log("I am here")
+        if (!frm.doc.custom_contact_id && frm.doc.customer) {
+            frm.add_custom_button(__('Update Contact'), function () {
+                if (frm.doc.customer) {
+                    frappe.call({
+                        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
+                        args: {
+                            customer: frm.doc.customer
+                        },
+                        callback: function (r) {
+                            if (r.message) {
+                                let contact = r.message;
+                                // if (contact.custom_contact_id) {
+                                // Set the custom_contact_id field in Sales Invoice
+                                frm.set_value('custom_contact_id', r.message);
+                                console.log('Set custom_contact_id:', r.message);
+                                // }
+                            }
+                        }
+                    });
+                }
+
+            });
+        }
     },
-    before_submit: function(frm){
-        send_invoice_to_xero(frm)
+    before_submit: async function (frm) {
+
+        return new Promise(function (resolve, reject) {
+            frappe.dom.unfreeze();
+            if (frm.doc.custom_contact_id) {
+                resolve();
+            } else {
+                let message = `Please confirm before submiting:<br><br>
+                Xero Contact Id is not found for this customer: ${frm.doc.customer}<br>
+                Do you still want to proceed without syncing invouce to Xero?<br><br>`;
+                frappe.confirm(
+                    message,
+                    () => {
+                        // User clicked "Yes"
+                        console.log("User confirmed to proceed without syncing to Xero");
+                        resolve();
+                    },
+                    () => {
+                        frappe.msgprint(`You can sync this invoice by following steps:<br><br>
+                        1. Go to Contact Master and add Customer Link If missing.<br>
+                        2. Click 'Sync to Zero' button in Contact.<br>
+                        3. Go to Sales Invoice and click 'Update Contact' button.<br>
+                        4. Click 'Submit' button in Sales Invoice.<br><br>`);
+                        reject();
+                    }
+                );
+            }
+        });
     },
-    before_save(frm) {
+
+    customer(frm) {
+        // Also trigger when customer is changed
         if (frm.doc.customer) {
-            // Get contact linked to the customer
             frappe.call({
                 method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
                 args: {
                     customer: frm.doc.customer
                 },
-                callback: function(r) {
+                callback: function (r) {
                     if (r.message) {
                         let contact = r.message;
                         // if (contact.custom_contact_id) {
-                            // Set the custom_contact_id field in Sales Invoice
-                            frm.set_value('custom_contact_id', r.message);
-                            console.log('Set custom_contact_id:', r.message);
-                        // }
-                    }
-                }
-            });
-        }
-    },
-    
-    customer(frm) {
-        // Also trigger when customer is changed
-        if (frm.doc.customer) {
-             frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
-                args: {
-                    customer: frm.doc.customer
-                },
-                callback: function(r) {
-                    if (r.message) {
-                        let contact = r.message;
-                        // if (contact.custom_contact_id) {
-                            // Set the custom_contact_id field in Sales Invoice
-                            frm.set_value('custom_contact_id', r.message);
-                            console.log('Set custom_contact_id:', r.message);
+                        // Set the custom_contact_id field in Sales Invoice
+                        frm.set_value('custom_contact_id', r.message);
+                        console.log('Set custom_contact_id:', r.message);
                         // }
                     }
                 }
@@ -52,35 +79,3 @@ frappe.ui.form.on('Sales Invoice', {
         }
     }
 });
-
-
-function send_invoice_to_xero(frm){
-     frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
-        args:{
-            doc: frm.doc.name
-        },
-        callback: function(r) {
-            if (r.message) {
-                if (r.message.status === 'success') {
-                    console.log(r.message)
-                    
-                    frappe.show_alert({
-                        title: 'Success',
-                        message: 'Invoice created successfully in Xero',
-                        indicator: 'green'
-                    })
-                    frm.set_value("custom_xero_invoice_number", r.message.data.InvoiceID);
-                    frm.set_df_property("custom_xero_invoice_number", 'read_only', 1);
-                    // frm.save()
-                } else {
-                    frappe.throw("Error creating invoice in Xero");
-                    
-                
-                }
-            }
-        }, error: function(e){
-            frappe.throw("Error creating invoice in Xero");
-        }
-    });
-}

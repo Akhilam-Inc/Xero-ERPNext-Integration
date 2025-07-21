@@ -29,7 +29,7 @@ class XeroAPIClient:
         
         # OAuth 2.0 settings
         self.client_id = self.settings.client_id
-        self.client_secret = self.settings.client_secret
+        self.client_secret = self.settings.get_password("client_secret")
         self.redirect_uri = self.settings.redirect_uri
         self.scope = "accounting.transactions accounting.contacts accounting.settings offline_access"
         
@@ -157,7 +157,9 @@ class XeroAPIClient:
             
             token_data = {
                 "grant_type": "refresh_token",
-                "refresh_token": self.refresh_token
+                "refresh_token": self.refresh_token,
+                "client_id": self.client_id,
+                "client_secret": self.client_secret
             }
             
             auth_header = base64.b64encode(
@@ -165,7 +167,7 @@ class XeroAPIClient:
             ).decode()
             
             headers = {
-                "Authorization": f"Basic {auth_header}",
+                # "Authorization": f"Basic {auth_header}",
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             
@@ -193,11 +195,11 @@ class XeroAPIClient:
                 
                 return True
             else:
-                frappe.log_error(f"Token refresh failed: {response.text}", "Xero Token Refresh")
+                frappe.log_error(title= "Xero Token Refresh" , message = f"Token refresh failed: {response.text}",)
                 return False
                 
         except Exception as e:
-            frappe.log_error(f"Token refresh error: {str(e)}", "Xero Token Refresh")
+            frappe.log_error(title="Xero Token Refresh", message= f"Token refresh error: {str(e)}")
             return False
     
     def _ensure_valid_token(self):
@@ -218,6 +220,7 @@ class XeroAPIClient:
     
     def make_request(self, method, endpoint, data=None, params=None):
         """Make authenticated request to Xero API"""
+        response = None
         try:
             # Ensure valid token
             self._ensure_valid_token()
@@ -279,7 +282,8 @@ class XeroAPIClient:
                 frappe.throw(_(error_msg))
                 
         except Exception as e:
-            frappe.log_error(f"API request failed: {str(e)}", "Xero API Request")
+            this._log_response(response)
+            frappe.log_error(title = "Xero API Request" , message = f"API request failed: {str(e)}")
             raise
     
     def test_connection(self):

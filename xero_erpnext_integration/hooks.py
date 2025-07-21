@@ -1,3 +1,4 @@
+
 app_name = "xero_erpnext_integration"
 app_title = "Xero Erpnext Integration"
 app_publisher = "nasirucode"
@@ -63,10 +64,21 @@ scheduler_events = {
 
 # Document Events
 doc_events = {
-    "Contact": {
-        "on_update": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.contact.on_update"
+    "Sales Invoice": {
+        "on_submit": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit",
     }
 }
+
+fixtures = [
+   {
+       "doctype": "Custom Field",
+       "filters": [["module", "=", "Fabric8Labs ERPNext"]]
+   },
+   {
+       "doctype": "Property Setter",
+       "filters": [["module", "=", "Fabric8Labs ERPNext"]]
+   }
+]
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
