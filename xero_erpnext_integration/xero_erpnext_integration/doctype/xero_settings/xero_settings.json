@@ -8,10 +8,12 @@
   "enable",
   "column_break_bynn",
   "debug_mode",
+  "authorization_section",
+  "client_id",
+  "column_break_eoet",
+  "client_secret",
   "section_break_fizg",
   "base_url",
-  "client_id",
-  "client_secret",
   "token_expires_at",
   "state",
   "scope",
@@ -32,8 +34,10 @@
    "fieldtype": "Column Break"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_fizg",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Configurations"
   },
   {
    "fieldname": "column_break_ftam",
@@ -83,7 +87,7 @@
   },
   {
    "fieldname": "client_secret",
-   "fieldtype": "Data",
+   "fieldtype": "Password",
    "label": "Client Secret"
   },
   {
@@ -125,13 +129,22 @@
    "fieldname": "tenant_id_url",
    "fieldtype": "Data",
    "label": "Tenant ID URL"
+  },
+  {
+   "fieldname": "authorization_section",
+   "fieldtype": "Section Break",
+   "label": "Authorization"
+  },
+  {
+   "fieldname": "column_break_eoet",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-28 02:47:58.104953",
+ "modified": "2025-07-02 02:37:20.711765",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Settings",

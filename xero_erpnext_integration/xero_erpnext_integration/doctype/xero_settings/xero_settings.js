@@ -14,20 +14,20 @@ frappe.ui.form.on('Xero Settings', {
             authorize(frm);
         });
         
-        frm.add_custom_button(__('Test Webhook'), function() {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.webhook_handler.test_webhook',
-                callback: function(r) {
-                    if (r.message) {
-                        if (r.message.status === 'success') {
-                           frappe.show_alert("Webhook Tested Successfully", 5)
-                        } else {
-                            frappe.show_alert("Error Testing Webhook", 5)
-                        }
-                    }
-                }
-            });
-        });
+        // frm.add_custom_button(__('Test Webhook'), function() {
+        //     frappe.call({
+        //         method: 'xero_erpnext_integration.xero_erpnext_integration.apis.webhook_handler.test_webhook',
+        //         callback: function(r) {
+        //             if (r.message) {
+        //                 if (r.message.status === 'success') {
+        //                    frappe.show_alert("Webhook Tested Successfully", 5)
+        //                 } else {
+        //                     frappe.show_alert("Error Testing Webhook", 5)
+        //                 }
+        //             }
+        //         }
+        //     });
+        // });
 
         frm.add_custom_button(__('Sync Paid Invoices'), function() {
             frappe.call({

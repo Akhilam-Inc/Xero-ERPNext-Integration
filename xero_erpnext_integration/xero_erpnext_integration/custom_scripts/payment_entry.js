@@ -3,7 +3,7 @@ frappe.ui.form.on('Payment Entry', {
         console.log("I am here")
     },
     before_submit: function(frm){
-        send_payment_to_xero(frm)
+        // send_payment_to_xero(frm)
     },
    
     
