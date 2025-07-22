@@ -72,11 +72,11 @@ doc_events = {
 fixtures = [
    {
        "doctype": "Custom Field",
-       "filters": [["module", "=", "Fabric8Labs ERPNext"]]
+       "filters": [["module", "=", "Xero Erpnext Integration"]]
    },
    {
        "doctype": "Property Setter",
-       "filters": [["module", "=", "Fabric8Labs ERPNext"]]
+       "filters": [["module", "=", "Xero Erpnext Integration"]]
    }
 ]
 
