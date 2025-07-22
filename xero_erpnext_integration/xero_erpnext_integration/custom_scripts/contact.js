@@ -41,7 +41,7 @@ frappe.ui.form.on('Contact', {
                                 frm.set_df_property("custom_send_to_xero", "read_only", true);
                                 frm.set_df_property("custom_account_number", "read_only", true);
                                 frm.save()
-                                frm.refresh();
+                                frm.reload_doc()
                             } else {
                                 frappe.show_alert({
                                     title: 'Error',
