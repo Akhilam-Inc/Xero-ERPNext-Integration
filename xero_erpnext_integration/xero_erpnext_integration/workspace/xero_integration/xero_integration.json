@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"I0AceHYFOQ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Xero Integration</span>\",\"col\":12}},{\"id\":\"RRvMkc2ap6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoice\",\"col\":3}},{\"id\":\"BvRCG4Fm6i\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payment Entry\",\"col\":3}},{\"id\":\"zGm-icD1ov\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Contact\",\"col\":3}},{\"id\":\"jZ4FG7H1Ce\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"e8ZyCC3Fm5\",\"type\":\"card\",\"data\":{\"card_name\":\"Masters\",\"col\":4}}]",
+ "content": "[{\"id\":\"I0AceHYFOQ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Xero Integration</span>\",\"col\":12}},{\"id\":\"RRvMkc2ap6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoice\",\"col\":3}},{\"id\":\"BvRCG4Fm6i\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payment Entry\",\"col\":3}},{\"id\":\"zGm-icD1ov\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Contact\",\"col\":3}},{\"id\":\"Y9GHNGEAYo\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"End User Documentation\",\"col\":3}},{\"id\":\"jZ4FG7H1Ce\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"e8ZyCC3Fm5\",\"type\":\"card\",\"data\":{\"card_name\":\"Masters\",\"col\":4}}]",
  "creation": "2025-06-25 01:26:47.103646",
  "custom_blocks": [],
  "docstatus": 0,
@@ -43,7 +43,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-07-21 22:47:12.707856",
+ "modified": "2025-07-22 19:47:35.282198",
  "modified_by": "Administrator",
  "module": "Xero Erpnext Integration",
  "name": "Xero Integration",
@@ -62,6 +62,13 @@
    "link_to": "Payment Entry",
    "stats_filter": "[[\"Payment Entry\",\"name\",\"is\",\"set\",false]]",
    "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "End User Documentation",
+   "type": "URL",
+   "url": "/end-user"
   },
   {
    "color": "Grey",
