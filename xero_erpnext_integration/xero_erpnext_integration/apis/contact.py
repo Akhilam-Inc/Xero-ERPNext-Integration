@@ -46,7 +46,7 @@ def create_contact(doc, method=None):
             "FirstName": contact.first_name or "",
             "LastName": contact.last_name or "",
             "EmailAddress": contact.email_id or "",
-            "AccountNumber": contact.name,
+            "AccountNumber": contact.custom_account_number or contact.name,
             "IsCustomer": True if contact.custom_is_customer == 1 else False,
             "IsSupplier": True if contact.custom_is_supplier == 1 else False,
             "Addresses": [

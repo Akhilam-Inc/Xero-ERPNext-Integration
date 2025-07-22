@@ -4,7 +4,7 @@ frappe.ui.form.on('Contact', {
 
         // Make the send_to_xero field read-only if contact already exists in Xero
         if (!frm.doc.custom_contact_id) {
-            if (!frm.is_new()) {
+            if (frm.doc.custom_send_to_xero) {
 
                 /*
                 * Add custom button to send contact to Xero
@@ -36,7 +36,9 @@ frappe.ui.form.on('Contact', {
                                     title: 'Success',
                                     message: 'Contact sent to Xero successfully',
                                     indicator: 'green'
-                                });
+                                }, 10);
+                                frm.set_value("custom_send_to_xero", 1);
+                                frm.save()
                             } else {
                                 frappe.show_alert({
                                     title: 'Error',
