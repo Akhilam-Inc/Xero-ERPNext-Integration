@@ -31,14 +31,17 @@ frappe.ui.form.on('Contact', {
                         },
                         callback: function (response) {
                             if (response.message) {
-                                frm.refresh();
+                                
                                 frappe.show_alert({
                                     title: 'Success',
                                     message: 'Contact sent to Xero successfully',
                                     indicator: 'green'
                                 }, 10);
                                 frm.set_value("custom_send_to_xero", 1);
+                                frm.set_df_property("custom_send_to_xero", "read_only", true);
+                                frm.set_df_property("custom_account_number", "read_only", true);
                                 frm.save()
+                                frm.refresh();
                             } else {
                                 frappe.show_alert({
                                     title: 'Error',
