@@ -36,8 +36,8 @@ def authorize():
                 
                 if test_result.get("status") == "success":
                     # Clear the authorization code since it's been used
-                    frappe.db.set_value("Xero Settings", settings.name, "code", "")
-                    frappe.db.commit()
+                    # frappe.db.set_value("Xero Settings", settings.name, "code", "")
+                    # frappe.db.commit()
                     
                     return {
                         "status": "success",
@@ -67,11 +67,30 @@ def authorize():
             }
             
     except Exception as e:
-        frappe.log_error(f"Xero Authorization Error: {str(e)}", "Xero Authorization")
-        return {
-            "status": "error",
-            "message": f"Authorization error: {str(e)}"
-        }
+        error_msg = str(e)
+        frappe.log_error(f"Xero Authorization Error: {error_msg}", "Xero Authorization")
+        
+        # Provide specific error messages for common issues
+        if "invalid_grant" in error_msg.lower():
+            return {
+                "status": "error",
+                "message": "Authorization code has expired or already been used. Please click 'Authorize' to get a new authorization code."
+            }
+        elif "400" in error_msg and "bad request" in error_msg.lower():
+            return {
+                "status": "error", 
+                "message": "Invalid authorization request. Please check your Client ID and Client Secret, then try authorizing again."
+            }
+        elif "401" in error_msg or "unauthorized" in error_msg.lower():
+            return {
+                "status": "error",
+                "message": "Invalid Client ID or Client Secret. Please check your Xero app credentials."
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"Authorization error: {error_msg}. Please try authorizing again."
+            }
 
 def test_connection_simple():
     """Simple connection test for authorization validation"""
