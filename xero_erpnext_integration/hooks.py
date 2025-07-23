@@ -50,10 +50,6 @@ doctype_js = {
     "Payment Entry": "xero_erpnext_integration/custom_scripts/payment_entry.js"
 }
 
-override_whitelisted_methods = {
-    "/api/method/xero_webhook": "xero_erpnext_integration.xero_erpnext_integration.apis.webhook.handle_webhook"
-}
-
 scheduler_events = {
     "cron": {
 		"0 */2 * * *":  [
