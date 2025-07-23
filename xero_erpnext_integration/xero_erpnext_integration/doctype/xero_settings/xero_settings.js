@@ -60,48 +60,61 @@ async function process_authorization(frm) {
         });
         
         // Authorization successful - update form with token data
+        let authorizationSuccessful = false;
+        
         if (response.token_data) {
             const tokenData = response.token_data;
             console.log(tokenData)
             
-            // Set all token fields
-            frm.doc.access_token = tokenData.access_token;
-            frm.doc.refresh_token = tokenData.refresh_token;
-            frm.doc.scope = tokenData.scope;
-            frm.doc.tenant_id = tokenData.tenant_id;
-            frm.doc.tenant_name = tokenData.tenant_name;
-            frm.doc.enable = 1;
-            
-            // Set expiry time from backend calculation
-            if (tokenData.expires_at) {
-                frm.doc.token_expires_at = tokenData.expires_at;
+            // Check if we actually received an access token
+            if (!tokenData.access_token) {
+                frappe.show_alert({
+                    message: __('Authorization failed: No access token received from Xero'),
+                    indicator: 'red'
+                });
+            } else {
+                // Set all token fields
+                frm.doc.access_token = tokenData.access_token;
+                frm.doc.refresh_token = tokenData.refresh_token;
+                frm.doc.scope = tokenData.scope;
+                frm.doc.tenant_id = tokenData.tenant_id;
+                frm.doc.tenant_name = tokenData.tenant_name;
+                frm.doc.enable = 1;
+                
+                // Set expiry time from backend calculation
+                if (tokenData.expires_at) {
+                    frm.doc.token_expires_at = tokenData.expires_at;
+                }
+                
+                // Refresh form to show updated values
+                frm.refresh_fields();
+                authorizationSuccessful = true;
             }
-            
-            // Refresh form to show updated values
-            frm.refresh_fields();
+        } else {
+            // No token data received at all
+            frappe.show_alert({
+                message: __('Authorization failed: No token data received from Xero'),
+                indicator: 'red'
+            });
         }
         
-        // Save the form with all updated values
+        // Save the form with all updated values (regardless of success/failure)
         await new Promise((resolve, reject) => {
             frm.save(null, function() {
+                console.log('Save successful');
                 resolve();
             }, function(error) {
+                console.log('Save failed:', error);
                 reject(error);
             });
         });
         
-        // Show success message
-        frappe.show_alert({
-            message: __('Authorization Successful!'),
-            indicator: 'green'
-        });
-
-        if(!response.token_data.access_token){
+        // Show appropriate message based on authorization result
+        if (authorizationSuccessful) {
             frappe.show_alert({
-                message: __('Access Token not received. Please try authorizing again.'),
-                indicator: 'red'
+                message: __('Authorization Successful!'),
+                indicator: 'green'
             });
-            frm.save()
         }
         
         // Clean up URL parameters
