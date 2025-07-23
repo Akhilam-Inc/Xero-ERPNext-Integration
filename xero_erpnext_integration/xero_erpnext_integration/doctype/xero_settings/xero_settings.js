@@ -29,7 +29,8 @@ frappe.ui.form.on('Xero Settings', {
 
     before_save: function(frm) {
         // Process authorization if code and scope are present
-        if (frm.doc.code && frm.doc.scope && !frm.doc.access_token) {
+        if (frm.doc.code && frm.doc.scope) {
+
             // Prevent multiple authorization attempts
             if (frm._authorizing) {
                 return Promise.resolve();
