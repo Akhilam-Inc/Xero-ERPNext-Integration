@@ -42,8 +42,6 @@ async function process_authorization(frm) {
         return;
     }
     frm._authorizing = true;
-    
-    try {
         // Call authorization API and wait for completion
         const response = await new Promise((resolve, reject) => {
             frappe.call({
@@ -81,22 +79,13 @@ async function process_authorization(frm) {
             
             // Refresh form to show updated values
             frm.refresh_fields();
-            
-            console.log('Token data set:', {
-                access_token: tokenData.access_token ? 'SET' : 'MISSING',
-                refresh_token: tokenData.refresh_token ? 'SET' : 'MISSING',
-                tenant_id: tokenData.tenant_id,
-                tenant_name: tokenData.tenant_name
-            });
         }
         
         // Save the form with all updated values
         await new Promise((resolve, reject) => {
             frm.save(null, function() {
-                console.log('Save successful');
                 resolve();
             }, function(error) {
-                console.log('Save failed:', error);
                 reject(error);
             });
         });
@@ -114,16 +103,6 @@ async function process_authorization(frm) {
         setTimeout(function() {
             window.location.reload();
         }, 1500);
-        
-    } catch (error) {
-        console.log('Authorization error:', error);
-        frappe.show_alert({
-            message: __('Authorization Failed: ') + (error.message || 'Please try authorizing again.'),
-            indicator: 'red'
-        });
-    } finally {
-        frm._authorizing = false;
-    }
 }
 
 function sync_paid_invoices(frm) {
