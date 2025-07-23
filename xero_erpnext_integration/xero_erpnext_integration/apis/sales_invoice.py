@@ -366,119 +366,118 @@ def create_invoice(doc, method=None):
         frappe.log_error("Xero Create Invoice", f"Failed to create invoice in Xero: {str(e)}")
         frappe.throw(f"Failed to create invoice in Xero: {str(e)}")
 
-# @frappe.whitelist()
-# def get_xero_invoices():
-#     """Get Xero invoices"""
-#     try:
-#         client = get_xero_client()
-#         response = client.make_request("GET", "/Invoices")
-        
-#         return {
-#             "status": "success",
-#             "data": response.get("Invoices", [])
-#         }
-        
-#     except Exception as e:
-#         return {
-#             "status": "error",
-#             "message": str(e)
-#         }
-
-# def get_invoice(invoice_id):
-#         """Get invoice from Xero"""
-#         try:
-#             client = get_xero_client()
-#             response = client.make_request("GET", f"Invoices/{invoice_id}")
-            
-#             if response and "Invoices" in response:
-#                 return {
-#                     "status": "success",
-#                     "data": response["Invoices"][0]
-#                 }
-            
-#             return None
-            
-#         except Exception as e:
-#             frappe.log_error(f"Failed to get invoice: {str(e)}", "Xero Get Invoice")
-#             return None
 
 
-# @frappe.whitelist() 
-# def create_invoice(doc, method=None):
-#     """Create invoice in Xero"""
-#     try:
-#         client = get_xero_client()
+@frappe.whitelist()
+def fetch_xero_contacts(contact_person):
+    """Fetch contacts from Xero and filter by similar names to contact person"""
+    try:
+        client = get_xero_client()
+        response = client.make_request("GET", "/Contacts")
         
-#         # Get the Sales Invoice document
-#         if isinstance(doc, str):
-#             invoice = frappe.get_doc("Sales Invoice", doc)
-#         else:
-#             invoice = doc
+        xero_contacts = response.get("Contacts", [])
+        contact_doc = frappe.get_doc("Contact", contact_person)
+        contact_name = contact_doc.name or ""
         
-#         # Get customer contact ID from Xero
-#         contact_id = get_customer_contact_id(invoice.customer)
-#         if not contact_id:
-#             frappe.throw(f"No Xero contact ID found for customer: {invoice.customer}")
-        
-#         # Prepare line items
-#         line_items = []
-#         for item in invoice.items:
-#             line_item = {
-#                 "Description": item.description or item.item_name,
-#                 "Quantity": str(item.qty),
-#                 "UnitAmount": str(item.rate),
-#                 "AccountCode": item.get("custom_account_code") or "200",  # Default to 200 if not set
-#             }
+        # Filter contacts with similar names
+        similar_contacts = []
+        for contact in xero_contacts:
+            xero_name = contact.get("Name", "").lower()
+            contact_name_lower = contact_name.lower()
             
-#             # Add discount rate if available
-#             if item.get("discount_percentage"):
-#                 line_item["DiscountRate"] = str(item.discount_percentage)
+            # Simple similarity check - contains or partial match
+            if (xero_name in contact_name_lower or 
+                contact_name_lower in xero_name or
+                any(word in xero_name for word in contact_name_lower.split() if len(word) > 2)):
+                similar_contacts.append(contact)
+        
+        return similar_contacts
+        
+    except Exception as e:
+        frappe.log_error(f"Failed to fetch Xero contacts: {str(e)}", "Fetch Xero Contacts")
+        return []
+
+
+@frappe.whitelist()
+def create_contact_and_map(contact_person, sales_invoice):
+    """Create contact in Xero using ERPNext contact details and map it"""
+    try:
+        # Get contact details from ERPNext
+        contact_doc = frappe.get_doc("Contact", contact_person)
+        
+        # Create contact in Xero
+        client = get_xero_client()
+        contact_data = {
+            "Name": contact_doc.name,
+            "FirstName": contact_doc.first_name or "",
+            "LastName": contact_doc.last_name or "",
+            "EmailAddress": contact_doc.email_id or "",
+            "AccountNumber": contact_doc.custom_account_number or contact_doc.name,
+            "IsCustomer": any(link.link_doctype == "Customer" for link in contact_doc.links),
+            "IsSupplier": any(link.link_doctype == "Supplier" for link in contact_doc.links),
+            "Addresses": [
+                {
+                    "AddressType": "STREET",
+                    "AddressLine1": contact_doc.address or "",
+                }
+            ],
+            "Phones": [
+                {
+                    "PhoneType": "DEFAULT",
+                    "PhoneNumber": contact_doc.phone or contact_doc.mobile_no or ""
+                }
+            ]
+        }
+        
+        data = {"Contacts": [contact_data]}
+        response = client.make_request("POST", "/Contacts", data=data)
+        
+        if response and response.get("Contacts"):
+            contact_id = response["Contacts"][0].get("ContactID")
             
-#             line_items.append(line_item)
-        
-#         # Prepare invoice data
-#         invoice_data = {
-#             "Type": "ACCREC",  # Accounts Receivable
-#             "Contact": {
-#                 "ContactID": contact_id
-#             },
-#             "DateString": invoice.posting_date.strftime("%Y-%m-%d") if invoice.posting_date else None,
-#             "DueDateString": invoice.due_date.strftime("%Y-%m-%d") if invoice.due_date else None,
-#             "LineAmountTypes": "Exclusive",  # Tax exclusive
-#             "LineItems": line_items,
-#             "Reference": invoice.name,  # ERPNext invoice reference
-#             "Status": "AUTHORISED"  # Create as draft initially
-#         }
-        
-#         # Add currency if different from base currency
-#         if invoice.currency and invoice.currency != frappe.get_cached_value("Company", invoice.company, "default_currency"):
-#             invoice_data["CurrencyCode"] = invoice.currency
-        
-#         data = {"Invoices": [invoice_data]}
-#         response = client.make_request("POST", "/Invoices", data=data)
-        
-#         if response and "Invoices" in response:
-#             xero_invoice = response["Invoices"][0]
+            # Map the contact
+            map_result = map_contact_to_xero(contact_id, contact_person, sales_invoice)
             
-#             # Update ERPNext Sales Invoice with Xero Invoice ID
-#             # frappe.db.set_value("Sales Invoice", invoice.name, "custom_xero_invoice_number", xero_invoice.get("InvoiceID"))
-#             # frappe.db.commit()
-            
-#             return {
-#                 "status": "success",
-#                 "data": xero_invoice,
-#                 "message": f"Invoice created in Xero with ID: {xero_invoice.get('InvoiceID')}"
-#             }
+            if map_result:
+                return {
+                    "status": "success",
+                    "contact_id": contact_id,
+                    "message": "Contact created and mapped successfully"
+                }
         
-#         return {
-#             "status": "error",
-#             "message": "Failed to create invoice in Xero"
-#         }
+        return {
+            "status": "error",
+            "message": "Failed to create contact in Xero"
+        }
         
-#     except Exception as e:
-#         frappe.log_error("Xero Create Invoice", f"Failed to create invoice in Xero: {str(e)}")
-#         frappe.throw(f"Failed to create invoice in Xero: {str(e)}")
-#         return False
+    except Exception as e:
+        frappe.log_error(f"Failed to create and map contact: {str(e)}", "Create Contact and Map")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@frappe.whitelist()
+def map_contact_to_xero(contact_id, contact_person, sales_invoice):
+    """Map contact to Xero by setting contact_id in Contact and Sales Invoice"""
+    try:
+        # Update Contact with Xero contact ID
+        contact_doc = frappe.get_doc("Contact", contact_person)
+        contact_doc.custom_contact_id = contact_id
+        contact_doc.custom_send_to_xero = 1
+        contact_doc.save()
+        
+        # Update Sales Invoice with Xero contact ID
+        sales_invoice_doc = frappe.get_doc("Sales Invoice", sales_invoice)
+        sales_invoice_doc.custom_contact_id = contact_id
+        sales_invoice_doc.save()
+        
+        return True
+        
+    except Exception as e:
+        frappe.log_error(f"Failed to map contact: {str(e)}", "Map Contact to Xero")
+        return False
 
 
 @frappe.whitelist()

@@ -47,16 +47,12 @@ def create_contact(doc, method=None):
             "LastName": contact.last_name or "",
             "EmailAddress": contact.email_id or "",
             "AccountNumber": contact.custom_account_number or contact.name,
-            "IsCustomer": True if contact.custom_is_customer == 1 else False,
-            "IsSupplier": True if contact.custom_is_supplier == 1 else False,
+            "IsCustomer": any(link.link_doctype == "Customer" for link in contact.links),
+            "IsSupplier": any(link.link_doctype == "Supplier" for link in contact.links),
             "Addresses": [
                 {
                     "AddressType": "STREET",
                     "AddressLine1": contact.address or "",
-                    # "City": contact.city,
-                    # "Region": contact.state,
-                    # "PostalCode": contact.postal_code,
-                    # "Country": contact.country
                 }
             ],
             "Phones": [
