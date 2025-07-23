@@ -162,7 +162,8 @@ class XeroAPIClient:
                     "expires_in": expires_in,
                     "expires_at": expires_at.isoformat(),
                     "tenant_id": self.settings.tenant_id,
-                    "tenant_name": self.settings.tenant_name
+                    "tenant_name": self.settings.tenant_name,
+                    "status": "success"
                 }
                 
             # Handle specific error status codes
