@@ -24,7 +24,7 @@ class XeroAPIClient:
         self.settings = frappe.get_single("Xero Settings")
         self.base_url = "https://api.xero.com/api.xro/2.0"
         self.auth_url = "https://login.xero.com/identity/connect/authorize"
-        self.token_url = self.settings.access_token_url
+        self.token_url = "https://identity.xero.com/connect/token"
         self.connections_url = "https://api.xero.com/connections"
         
         # OAuth 2.0 settings
@@ -74,10 +74,22 @@ class XeroAPIClient:
     def exchange_code_for_token(self, state=None):
         """Exchange authorization code for access token"""
         try:
+            # Validate required fields
+            if not self.settings.code:
+                frappe.log_error("No authorization code available", "Xero Token Exchange")
+                return False
+                
+            if not self.client_id or not self.client_secret:
+                frappe.log_error("Missing client credentials", "Xero Token Exchange")
+                return False
+                
+            if not self.redirect_uri:
+                frappe.log_error("Missing redirect URI", "Xero Token Exchange")
+                return False
+            
             # Prepare token request
             token_data = {
                 "grant_type": "authorization_code",
-                # "client_id": self.client_id,
                 "code": self.settings.code,
                 "redirect_uri": self.redirect_uri
             }
@@ -92,19 +104,35 @@ class XeroAPIClient:
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             
+            # Log request details (without sensitive info)
+            frappe.log_error(f"Token exchange request to: {self.token_url}", "Xero Token Exchange Debug")
+            
             # Make token request
             response = requests.post(self.token_url, data=token_data, headers=headers)
             
-            if response.status_code == 200:
-                token_data = response.json()
+            # Log the response status for debugging
+            frappe.log_error(f"Token exchange response: {response.status_code}", "Xero Token Exchange Debug")
+            
+            # Handle successful responses (200-299 range)
+            if 200 <= response.status_code < 300:
+                try:
+                    token_response = response.json()
+                except ValueError as e:
+                    frappe.log_error(f"Invalid JSON in token response: {response.text}", "Xero Token Exchange")
+                    raise Exception(f"Invalid response format from Xero: {str(e)}")
+                
+                # Validate response contains required tokens
+                if not token_response.get("access_token"):
+                    frappe.log_error(f"No access token in response: {token_response}", "Xero Token Exchange")
+                    raise Exception("No access token received from Xero")
                 
                 # Save tokens to settings
-                self.settings.access_token = token_data.get("access_token")
-                self.settings.refresh_token = token_data.get("refresh_token")
-                # self.settings.scope = token_data.get("scope")
+                self.settings.access_token = token_response.get("access_token")
+                self.settings.refresh_token = token_response.get("refresh_token")
+                self.settings.scope = token_response.get("scope")
                 
                 # Calculate expiry time
-                expires_in = token_data.get("expires_in", 1800)  # Default 30 minutes
+                expires_in = token_response.get("expires_in", 1800)  # Default 30 minutes
                 expires_at = datetime.now() + timedelta(seconds=expires_in)
                 self.settings.token_expires_at = expires_at
                 
@@ -114,15 +142,61 @@ class XeroAPIClient:
                 # Save settings
                 self.settings.save()
                 
+                frappe.log_error("Token exchange successful", "Xero Token Exchange Debug")
                 return True
+                
+            # Handle specific error status codes
+            elif response.status_code == 400:
+                try:
+                    error_response = response.json()
+                    error_type = error_response.get("error", "bad_request")
+                    error_description = error_response.get("error_description", response.text)
+                    
+                    if error_type == "invalid_grant":
+                        error_msg = "Authorization code has expired or already been used"
+                    elif error_type == "invalid_client":
+                        error_msg = "Invalid Client ID or Client Secret"
+                    elif error_type == "invalid_request":
+                        error_msg = "Invalid authorization request - check redirect URI"
+                    else:
+                        error_msg = f"Bad request: {error_description}"
+                        
+                    frappe.log_error(f"400 Error: {error_response}", "Xero Token Exchange")
+                    raise Exception(error_msg)
+                except ValueError:
+                    error_msg = f"Bad request (400): {response.text}"
+                    frappe.log_error(error_msg, "Xero Token Exchange")
+                    raise Exception(error_msg)
+                    
+            elif response.status_code == 401:
+                error_msg = "Unauthorized - Invalid Client ID or Client Secret"
+                frappe.log_error(f"401 Error: {response.text}", "Xero Token Exchange")
+                raise Exception(error_msg)
+                
+            elif response.status_code == 403:
+                error_msg = "Forbidden - Client not authorized for this operation"
+                frappe.log_error(f"403 Error: {response.text}", "Xero Token Exchange")
+                raise Exception(error_msg)
+                
+            elif response.status_code == 429:
+                error_msg = "Rate limit exceeded - Please try again later"
+                frappe.log_error(f"429 Error: {response.text}", "Xero Token Exchange")
+                raise Exception(error_msg)
+                
+            elif response.status_code >= 500:
+                error_msg = f"Xero server error ({response.status_code}) - Please try again later"
+                frappe.log_error(f"Server Error: {response.status_code} - {response.text}", "Xero Token Exchange")
+                raise Exception(error_msg)
+                
             else:
-                error_msg = f"Token exchange failed: {response.status_code} - {response.text}"
+                error_msg = f"Unexpected response ({response.status_code}): {response.text}"
                 frappe.log_error(error_msg, "Xero Token Exchange")
-                return False
+                raise Exception(error_msg)
                 
         except Exception as e:
-            frappe.log_error(f"Token exchange error: {str(e)}", "Xero Token Exchange")
-            return False
+            error_details = f"Token exchange error: {str(e)}"
+            frappe.log_error(error_details, "Xero Token Exchange")
+            raise  # Re-raise to let calling function handle it
     
     def _get_and_save_tenant_info(self):
         """Get tenant information and save to settings"""

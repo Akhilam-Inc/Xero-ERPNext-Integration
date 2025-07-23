@@ -60,9 +60,6 @@ frappe.ui.form.on('Xero Settings', {
                             
                             resolve();
                         } else {
-                            // Clear the used/invalid code to prevent reuse
-                            frm.set_value('code', '');
-                            
                             frappe.msgprint({
                                 title: __('Authorization Failed'),
                                 message: r.message ? r.message.message : 'Authorization failed. Please try authorizing again.',
@@ -73,8 +70,6 @@ frappe.ui.form.on('Xero Settings', {
                     },
                     error: function(r) {
                         frm._authorizing = false;
-                        // Clear the used/invalid code
-                        frm.set_value('code', '');
                         
                         frappe.msgprint({
                             title: __('Authorization Error'),

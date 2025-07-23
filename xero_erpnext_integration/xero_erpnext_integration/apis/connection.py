@@ -23,47 +23,38 @@ def authorize():
         
         # Initialize client and exchange code for token
         client = get_xero_client()
-        success = client.exchange_code_for_token()
+        client.exchange_code_for_token()  # This will raise an exception if it fails
         
-        if success:
-            # Reload settings to get updated tokens
-            settings.reload()
+        # If we reach here, the token exchange was successful
+        # Reload settings to get updated tokens
+        settings.reload()
+        
+        # Verify we got the access token
+        if settings.access_token:
+            # Test the connection to ensure tokens work
+            test_result = test_connection_simple()
             
-            # Verify we got the access token
-            if settings.access_token:
-                # Test the connection to ensure tokens work
-                test_result = test_connection_simple()
-                
-                if test_result.get("status") == "success":
-                    # Clear the authorization code since it's been used
-                    # frappe.db.set_value("Xero Settings", settings.name, "code", "")
-                    # frappe.db.commit()
-                    
-                    return {
-                        "status": "success",
-                        "message": "Authorization successful! Connection established with Xero.",
-                        "data": {
-                            "access_token_exists": True,
-                            "tenant_id": settings.tenant_id,
-                            "tenant_name": settings.tenant_name,
-                            "organization": test_result.get("data", {})
-                        },
-                        "refresh_page": True  # Signal frontend to refresh
-                    }
-                else:
-                    return {
-                        "status": "error",
-                        "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
-                    }
+            if test_result.get("status") == "success":
+                return {
+                    "status": "success",
+                    "message": "Authorization successful! Connection established with Xero.",
+                    "data": {
+                        "access_token_exists": True,
+                        "tenant_id": settings.tenant_id,
+                        "tenant_name": settings.tenant_name,
+                        "organization": test_result.get("data", {})
+                    },
+                    "refresh_page": True  # Signal frontend to refresh
+                }
             else:
                 return {
                     "status": "error",
-                    "message": "Authorization failed: Access token not received from Xero."
+                    "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
                 }
         else:
             return {
                 "status": "error",
-                "message": "Failed to exchange authorization code for access token. Please try authorizing again."
+                "message": "Authorization failed: Access token not received from Xero."
             }
             
     except Exception as e:
