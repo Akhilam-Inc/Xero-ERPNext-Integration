@@ -5,9 +5,49 @@ import hmac
 import base64
 from frappe import _
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def webhook():
     """Main Xero webhook endpoint"""
+    try:
+        request = frappe.local.request
+        
+        # Handle GET request for "intent to receive" challenge
+        if request.method == "GET":
+            return handle_intent_to_receive()
+        
+        # Handle POST request for actual webhook events
+        elif request.method == "POST":
+            return handle_webhook_event()
+        
+        return '', 405  # Method not allowed
+        
+    except Exception as e:
+        frappe.log_error(f"Xero Webhook Error: {str(e)}", "Xero Webhook Handler")
+        return '', 500
+
+def handle_intent_to_receive():
+    """Handle Xero's intent to receive challenge (GET request)"""
+    try:
+        request = frappe.local.request
+        
+        # Get the challenge parameter from query string
+        challenge = request.args.get('challenge')
+        if not challenge:
+            return '', 400
+        
+        # Return the challenge value as response with 200 status
+        frappe.local.response.update({
+            'message': challenge,
+            'http_status_code': 200
+        })
+        return challenge
+        
+    except Exception as e:
+        frappe.log_error(f"Error handling intent to receive: {str(e)}", "Xero Webhook")
+        return '', 500
+
+def handle_webhook_event():
+    """Handle actual webhook events (POST request)"""
     try:
         settings = frappe.get_single("Xero Settings")
         webhook_key = settings.webhook_secret
@@ -33,7 +73,7 @@ def webhook():
         return '', 200
         
     except Exception as e:
-        frappe.log_error(f"Xero Webhook Error: {str(e)}", "Xero Webhook Handler")
+        frappe.log_error(f"Error handling webhook event: {str(e)}", "Xero Webhook Handler")
         return '', 500
 
 def process_webhook_event(event):
