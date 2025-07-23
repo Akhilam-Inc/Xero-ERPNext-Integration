@@ -67,7 +67,13 @@ def handle_webhook_event():
             return "Unauthorized"
 
         # Process webhook payload
-        req_data = request.json()
+        try:
+            # Try calling json() method first
+            req_data = request.json() if callable(request.json) else request.json
+        except:
+            # Fallback to getting json data from request
+            req_data = frappe.local.form_dict
+        
         if req_data.get('events'):
             for event in req_data['events']:
                 process_webhook_event(event)
