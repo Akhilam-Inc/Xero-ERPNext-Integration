@@ -54,6 +54,9 @@ scheduler_events = {
     "cron": {
 		"0 */2 * * *":  [
 			"xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments"
+		],
+		"*/30 * * * *": [
+			"xero_erpnext_integration.xero_erpnext_integration.schedulers.voided_invoice_sync.sync_voided_invoices"
 		]
 	},
 }

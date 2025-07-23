@@ -38,11 +38,7 @@ def handle_intent_to_receive():
             frappe.local.response.http_status_code = 400
             return "Bad Request"
         
-        # Return the challenge value as response with 200 status
-        frappe.local.response.update({
-            'message': challenge,
-            'http_status_code': 200
-        })
+        # Return the challenge value directly - Xero expects plain text response
         return challenge
         
     except Exception as e:
