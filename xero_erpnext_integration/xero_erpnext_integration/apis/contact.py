@@ -41,22 +41,30 @@ def create_contact(doc, method=None):
     try:
         client = get_xero_client()
         contact = frappe.get_doc("Contact", doc)
+        
+        # Check customer and supplier links
+        is_customer = False
+        is_supplier = False
+        
+        if hasattr(contact, 'links') and contact.links:
+            for link in contact.links:
+                if link.link_doctype == "Customer":
+                    is_customer = True
+                if link.link_doctype == "Supplier":
+                    is_supplier = True
+        
         contact_data = {
             "Name": contact.name,
             "FirstName": contact.first_name or "",
             "LastName": contact.last_name or "",
             "EmailAddress": contact.email_id or "",
-            "AccountNumber": contact.name,
-            "IsCustomer": True if contact.custom_is_customer == 1 else False,
-            "IsSupplier": True if contact.custom_is_supplier == 1 else False,
+            "AccountNumber": contact.custom_account_number or contact.name,
+            "IsCustomer": is_customer,
+            "IsSupplier": is_supplier,
             "Addresses": [
                 {
                     "AddressType": "STREET",
                     "AddressLine1": contact.address or "",
-                    # "City": contact.city,
-                    # "Region": contact.state,
-                    # "PostalCode": contact.postal_code,
-                    # "Country": contact.country
                 }
             ],
             "Phones": [
