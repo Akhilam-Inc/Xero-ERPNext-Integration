@@ -95,6 +95,14 @@ async function process_authorization(frm) {
             message: __('Authorization Successful!'),
             indicator: 'green'
         });
+
+        if(!response.token_data.access_token){
+            frappe.show_alert({
+                message: __('Access Token not received. Please try authorizing again.'),
+                indicator: 'red'
+            });
+            frm.save()
+        }
         
         // Clean up URL parameters
         window.history.replaceState({}, document.title, window.location.pathname);
