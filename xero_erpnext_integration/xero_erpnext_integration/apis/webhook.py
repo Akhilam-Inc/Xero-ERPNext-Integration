@@ -146,7 +146,7 @@ def update_invoice_from_xero(invoice_id):
 def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
     """Handle when an invoice is marked as PAID in Xero"""
     try:
-        from .sales_invoice import create_payment_entry_from_xero
+        from .sales_invoice import create_payment_entry_from_xero, sync_invoice_payments
         
         # Check if invoice is submitted in ERPNext
         if sales_invoice["docstatus"] != 1:
@@ -176,11 +176,12 @@ def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
         erpnext_invoice = SimpleNamespace(**sales_invoice)
         frappe.log_error("Xero Webhook", f"Invoice Object: {erpnext_invoice.name} {xero_invoice} {amount_paid}")
         
-        payment_result = create_payment_entry_from_xero(
-            erpnext_invoice,
-            xero_invoice,
-            amount_paid
-        )
+        # payment_result = create_payment_entry_from_xero(
+        #     erpnext_invoice,
+        #     xero_invoice,
+        #     amount_paid
+        # )
+        payment_result = sync_invoice_payments()
         
         if payment_result and payment_result.get("status") == "success":
             frappe.log_error(f"Payment entry created for invoice {sales_invoice['name']}: {payment_result.get('payment_entry')}", "Xero Webhook Success")
