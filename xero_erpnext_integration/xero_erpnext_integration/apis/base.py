@@ -139,8 +139,8 @@ class XeroAPIClient:
                 # Get tenant information
                 self._get_and_save_tenant_info()
                 
-                # Save settings
-                self.settings.save()
+                # Save settings immediately to avoid conflicts
+                self.settings.save(ignore_permissions=True)
                 
                 frappe.log_error("Token exchange successful", "Xero Token Exchange Debug")
                 return True

@@ -25,71 +25,62 @@ frappe.ui.form.on('Xero Settings', {
         } else {
             frm.dashboard.add_indicator(__('Not Connected'), 'red');
         }
-    },
-
-    before_save: function(frm) {
-        // Process authorization if code and scope are present
-        if (frm.doc.code && frm.doc.scope) {
-
-            // Prevent multiple authorization attempts
-            if (frm._authorizing) {
-                return Promise.resolve();
-            }
-            frm._authorizing = true;
-            
-            return new Promise(function(resolve, reject) {
-                frappe.call({
-                    method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
-                    callback: function(r) {
-                        frm._authorizing = false;
-                        
-                        if (r.message && r.message.status === 'success') {
-                            frappe.show_alert({
-                                message: __('Authorization Successful!'),
-                                indicator: 'green'
-                            });
-                            
-                            // Clean up URL parameters
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                            
-                            // Refresh page if requested by backend
-                            if (r.message.refresh_page) {
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 1500);
-                            }
-                            
-                            resolve();
-                        } else {
-                            frappe.msgprint({
-                                title: __('Authorization Failed'),
-                                message: r.message ? r.message.message : 'Authorization failed. Please try authorizing again.',
-                                indicator: 'red'
-                            });
-                            resolve();
-                        }
-                    },
-                    error: function(r) {
-                        frm._authorizing = false;
-                        
-                        frappe.msgprint({
-                            title: __('Authorization Error'),
-                            message: __('Network error during authorization. Please try again.'),
-                            indicator: 'red'
-                        });
-                        resolve();
-                    }
-                });
-            });
-        }
     }
 });
 
 function handle_authorization_callback(frm, code, scope) {
-    // Set the authorization values and save to trigger before_save
+    // Set the authorization values and process immediately without save conflict
     frm.set_value("code", code);
-    frm.set_value("scope", scope);
-    frm.save();
+    frm.set_value("scope", scope);    
+    // Process authorization directly without triggering save
+    process_authorization(frm);
+}
+
+function process_authorization(frm) {
+    if (frm._authorizing) {
+        return;
+    }
+    frm._authorizing = true;
+    
+    frappe.call({
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
+        callback: function(r) {
+            frm._authorizing = false;
+            
+            if (r.message && r.message.status === 'success') {
+                frappe.show_alert({
+                    message: __('Authorization Successful!'),
+                    indicator: 'green'
+                });
+                
+                // Clean up URL parameters
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Refresh page if requested by backend
+                if (r.message.refresh_page) {
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } else {
+                
+                frappe.msgprint({
+                    title: __('Authorization Failed'),
+                    message: r.message ? r.message.message : 'Authorization failed. Please try authorizing again.',
+                    indicator: 'red'
+                });
+            }
+        },
+        error: function(r) {
+            frm._authorizing = false;
+            
+            frappe.msgprint({
+                title: __('Authorization Error'),
+                message: __('Network error during authorization. Please try again.'),
+                indicator: 'red'
+            });
+        }
+    });
 }
 
 function sync_paid_invoices(frm) {

@@ -26,8 +26,8 @@ def authorize():
         client.exchange_code_for_token()  # This will raise an exception if it fails
         
         # If we reach here, the token exchange was successful
-        # Reload settings to get updated tokens
-        settings.reload()
+        # The settings object has been updated but not saved yet
+        # We'll let the frontend save handle the persistence
         
         # Verify we got the access token
         if settings.access_token:
