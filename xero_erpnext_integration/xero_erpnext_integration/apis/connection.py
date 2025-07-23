@@ -23,38 +23,31 @@ def authorize():
         
         # Initialize client and exchange code for token
         client = get_xero_client()
-        client.exchange_code_for_token()  # This will raise an exception if it fails
+        token_data = client.exchange_code_for_token()  # Returns token data or raises exception
         
         # If we reach here, the token exchange was successful
-        # The settings object has been updated but not saved yet
-        # We'll let the frontend save handle the persistence
+        # Test the connection to ensure tokens work
+        test_result = test_connection_simple()
         
-        # Verify we got the access token
-        if settings.access_token:
-            # Test the connection to ensure tokens work
-            test_result = test_connection_simple()
-            
-            if test_result.get("status") == "success":
-                return {
-                    "status": "success",
-                    "message": "Authorization successful! Connection established with Xero.",
-                    "data": {
-                        "access_token_exists": True,
-                        "tenant_id": settings.tenant_id,
-                        "tenant_name": settings.tenant_name,
-                        "organization": test_result.get("data", {})
-                    },
-                    "refresh_page": True  # Signal frontend to refresh
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
-                }
+        if test_result.get("status") == "success":
+            return {
+                "status": "success",
+                "message": "Authorization successful! Connection established with Xero.",
+                "token_data": {
+                    "access_token": token_data["access_token"],
+                    "refresh_token": token_data["refresh_token"],
+                    "scope": token_data["scope"],
+                    "expires_in": token_data["expires_in"],
+                    "tenant_id": token_data["tenant_id"],
+                    "tenant_name": token_data["tenant_name"]
+                },
+                "organization": test_result.get("data", {}),
+                "save_required": True  # Signal frontend to save
+            }
         else:
             return {
                 "status": "error",
-                "message": "Authorization failed: Access token not received from Xero."
+                "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
             }
             
     except Exception as e:

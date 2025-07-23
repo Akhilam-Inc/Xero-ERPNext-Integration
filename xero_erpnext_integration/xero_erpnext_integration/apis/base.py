@@ -139,11 +139,17 @@ class XeroAPIClient:
                 # Get tenant information
                 self._get_and_save_tenant_info()
                 
-                # Save settings immediately to avoid conflicts
-                self.settings.save(ignore_permissions=True)
-                
                 frappe.log_error("Token exchange successful", "Xero Token Exchange Debug")
-                return True
+                
+                # Return token data for caller to use
+                return {
+                    "access_token": token_response.get("access_token"),
+                    "refresh_token": token_response.get("refresh_token"),
+                    "scope": token_response.get("scope"),
+                    "expires_in": expires_in,
+                    "tenant_id": self.settings.tenant_id,
+                    "tenant_name": self.settings.tenant_name
+                }
                 
             # Handle specific error status codes
             elif response.status_code == 400:

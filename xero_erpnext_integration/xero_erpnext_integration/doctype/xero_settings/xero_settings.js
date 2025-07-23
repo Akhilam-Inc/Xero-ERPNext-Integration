@@ -29,58 +29,87 @@ frappe.ui.form.on('Xero Settings', {
 });
 
 function handle_authorization_callback(frm, code, scope) {
-    // Set the authorization values and process immediately without save conflict
+    // Set the authorization values and process immediately
     frm.set_value("code", code);
-    frm.set_value("scope", scope);    
-    // Process authorization directly without triggering save
+    frm.set_value("scope", scope);
+    
+    // Process authorization with async/await
     process_authorization(frm);
 }
 
-function process_authorization(frm) {
+async function process_authorization(frm) {
     if (frm._authorizing) {
         return;
     }
     frm._authorizing = true;
     
-    frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
-        callback: function(r) {
-            frm._authorizing = false;
-            
-            if (r.message && r.message.status === 'success') {
-                frappe.show_alert({
-                    message: __('Authorization Successful!'),
-                    indicator: 'green'
-                });
-                
-                // Clean up URL parameters
-                window.history.replaceState({}, document.title, window.location.pathname);
-                
-                // Refresh page if requested by backend
-                if (r.message.refresh_page) {
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 1500);
+    try {
+        // Call authorization API and wait for completion
+        const response = await new Promise((resolve, reject) => {
+            frappe.call({
+                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
+                callback: function(r) {
+                    if (r.message && r.message.status === 'success') {
+                        resolve(r.message);
+                    } else {
+                        reject(r.message);
+                    }
+                },
+                error: function(r) {
+                    reject({ message: 'Network error during authorization. Please try again.' });
                 }
-            } else {
-                
-                frappe.msgprint({
-                    title: __('Authorization Failed'),
-                    message: r.message ? r.message.message : 'Authorization failed. Please try authorizing again.',
-                    indicator: 'red'
-                });
-            }
-        },
-        error: function(r) {
-            frm._authorizing = false;
-            
-            frappe.msgprint({
-                title: __('Authorization Error'),
-                message: __('Network error during authorization. Please try again.'),
-                indicator: 'red'
             });
+        });
+        
+        // Authorization successful - update form with token data
+        if (response.token_data) {
+            frm.set_value('access_token', response.token_data.access_token);
+            frm.set_value('refresh_token', response.token_data.refresh_token);
+            frm.set_value('scope', response.token_data.scope);
+            frm.set_value('tenant_id', response.token_data.tenant_id);
+            frm.set_value('tenant_name', response.token_data.tenant_name);
+            frm.set_value('enable', 1);
+            
+            // Calculate and set expiry time
+            if (response.token_data.expires_in) {
+                const expiryTime = new Date();
+                expiryTime.setSeconds(expiryTime.getSeconds() + response.token_data.expires_in);
+                frm.set_value('token_expires_at', expiryTime);
+            }
         }
-    });
+        
+        // Save the form with all updated values
+        await new Promise((resolve, reject) => {
+            frm.save(null, function() {
+                resolve();
+            }, function() {
+                reject();
+            });
+        });
+        
+        // Show success message
+        frappe.show_alert({
+            message: __('Authorization Successful!'),
+            indicator: 'green'
+        });
+        
+        // Clean up URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Refresh page to show updated status
+        setTimeout(function() {
+            window.location.reload();
+        }, 1500);
+        
+    } catch (error) {
+        frappe.msgprint({
+            title: __('Authorization Failed'),
+            message: error.message || 'Authorization failed. Please try authorizing again.',
+            indicator: 'red'
+        });
+    } finally {
+        frm._authorizing = false;
+    }
 }
 
 function sync_paid_invoices(frm) {
