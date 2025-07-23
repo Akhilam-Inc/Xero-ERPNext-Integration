@@ -105,13 +105,11 @@ class XeroAPIClient:
             }
             
             # Log request details (without sensitive info)
-            frappe.log_error(f"Token exchange request to: {self.token_url}", "Xero Token Exchange Debug")
             
             # Make token request
             response = requests.post(self.token_url, data=token_data, headers=headers)
             
             # Log the response status for debugging
-            frappe.log_error(f"Token exchange response: {response.status_code}", "Xero Token Exchange Debug")
             
             # Handle successful responses (200-299 range)
             if 200 <= response.status_code < 300:
@@ -151,9 +149,7 @@ class XeroAPIClient:
                 if not self.settings.tenant_id:
                     frappe.log_error("No tenant ID received from Xero connections", "Xero Token Exchange")
                     raise Exception("Failed to get tenant information from Xero")
-                
-                frappe.log_error("Token exchange successful", "Xero Token Exchange Debug")
-                
+                                
                 # Return complete token data
                 return {
                     "access_token": access_token,
@@ -229,14 +225,10 @@ class XeroAPIClient:
                 return
             
             # Get connections (tenants)
-            frappe.log_error(f"Fetching tenant info from: {self.connections_url}", "Xero Tenant Info Debug")
             response = requests.get(self.connections_url, headers=self.headers)
-            
-            frappe.log_error(f"Tenant info response: {response.status_code}", "Xero Tenant Info Debug")
-            
+                        
             if response.status_code == 200:
                 connections = response.json()
-                frappe.log_error(f"Received {len(connections) if connections else 0} tenant connections", "Xero Tenant Info Debug")
                 
                 if connections and len(connections) > 0:
                     # Use first connection as default
@@ -250,7 +242,6 @@ class XeroAPIClient:
                     # Update headers with tenant ID for future requests
                     self.headers["Xero-Tenant-Id"] = tenant_id
                     
-                    frappe.log_error(f"Set tenant: {tenant_name} ({tenant_id})", "Xero Tenant Info Debug")
                 else:
                     frappe.log_error("No tenant connections available", "Xero Tenant Info")
             else:

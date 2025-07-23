@@ -117,9 +117,8 @@ async function process_authorization(frm) {
         
     } catch (error) {
         console.log('Authorization error:', error);
-        frappe.msgprint({
-            title: __('Authorization Failed'),
-            message: error.message || 'Authorization failed. Please try authorizing again.',
+        frappe.show_alert({
+            message: __('Authorization Failed: ') + (error.message || 'Please try authorizing again.'),
             indicator: 'red'
         });
     } finally {
@@ -149,12 +148,18 @@ function sync_paid_invoices(frm) {
 function authorize(frm) {
     // Validate required fields
     if (!frm.doc.client_id) {
-        frappe.msgprint(__('Please enter the Client ID before authorizing.'));
+        frappe.show_alert({
+            message: __('Please enter the Client ID before authorizing.'),
+            indicator: 'red'
+        });
         return;
     }
     
     if (!frm.doc.redirect_uri) {
-        frappe.msgprint(__('Please enter the Redirect URI before authorizing.'));
+        frappe.show_alert({
+            message: __('Please enter the Redirect URI before authorizing.'),
+            indicator: 'red'
+        });
         return;
     }
     
