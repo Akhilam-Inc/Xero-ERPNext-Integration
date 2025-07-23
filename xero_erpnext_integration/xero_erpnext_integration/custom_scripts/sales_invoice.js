@@ -20,33 +20,6 @@ frappe.ui.form.on('Sales Invoice', {
             });
         }
     },
-    before_submit: async function (frm) {
-
-        return new Promise(function (resolve, reject) {
-            frappe.dom.unfreeze();
-            if (frm.doc.custom_contact_id) {
-                resolve();
-            } else if(frm.doc.custom_do_not_sync_to_xero) {
-                let message = `Please confirm before submiting:<br><br>
-                Do not Sync is checked<br>
-                Do you still want to proceed without syncing invoice to Xero?<br><br>`;
-                frappe.confirm(
-                    message,
-                    () => {
-                        // User clicked "Yes"
-                        console.log("User confirmed to proceed without syncing to Xero");
-                        resolve();
-                    },
-                    () => {
-                        frappe.msgprint(`You can sync this invoice by following steps:<br><br>
-                        1. Uncheck 'Do not Sync to Xero' checkbox in Sales Invoice.<br>
-                        2. Click on update contact button if contact id not set.<br>><br>`);
-                        reject();
-                    }
-                );
-            }
-        });
-    },
 
     customer(frm) {
         // Also trigger when customer is changed
@@ -91,8 +64,13 @@ function show_contact_mapping_dialog(frm, xero_contacts, contact_person) {
                 label: __('Similar Xero Contacts')
             }
         ],
-        primary_action_label: __('Close'),
+        primary_action_label: __('Create New Contact'),
         primary_action: function() {
+            d.hide();
+            create_contact_in_xero(frm, contact_person);
+        },
+        secondary_action_label: __('Close'),
+        secondary_action: function() {
             d.hide();
         }
     });

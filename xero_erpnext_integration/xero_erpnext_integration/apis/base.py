@@ -282,7 +282,7 @@ class XeroAPIClient:
                 frappe.throw(_(error_msg))
                 
         except Exception as e:
-            this._log_response(response)
+            self._log_response(response)
             frappe.log_error(title = "Xero API Request" , message = f"API request failed: {str(e)}")
             raise
     

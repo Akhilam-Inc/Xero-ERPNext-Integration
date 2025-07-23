@@ -494,6 +494,61 @@ def map_contact_to_xero(contact_id, contact_person, sales_invoice):
 
 
 @frappe.whitelist()
+def cancel_invoice_in_xero(xero_invoice_id):
+    """Cancel/void an invoice in Xero"""
+    try:
+        client = get_xero_client()
+        
+        # First, get the current invoice to check its status
+        response = client.make_request("GET", f"/Invoices/{xero_invoice_id}")
+        
+        if not response or "Invoices" not in response:
+            return {
+                "status": "error",
+                "message": "Invoice not found in Xero"
+            }
+        
+        current_invoice = response["Invoices"][0]
+        current_status = current_invoice.get("Status")
+        
+        # Check if invoice can be voided
+        if current_status in ["PAID"]:
+            return {
+                "status": "info",
+                "message": f"Invoice cannot be cancelled as it is already {current_status}"
+            }
+        
+        # Void the invoice
+        invoice_data = {
+            "InvoiceID": xero_invoice_id,
+            "Status": "VOIDED"
+        }
+        
+        data = {"Invoices": [invoice_data]}
+        response = client.make_request("POST", "/Invoices", data=data)
+        
+        if response and "Invoices" in response:
+            voided_invoice = response["Invoices"][0]
+            return {
+                "status": "success",
+                "message": f"Invoice {xero_invoice_id} cancelled successfully in Xero",
+                "data": voided_invoice
+            }
+        
+        return {
+            "status": "error",
+            "message": "Failed to cancel invoice in Xero"
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Failed to cancel invoice {xero_invoice_id} in Xero: {str(e)}", "Xero Cancel Invoice")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@frappe.whitelist()
 def get_customer_contact_id(customer):
     # Method 1: Using frappe.db.sql for more control
     try:
