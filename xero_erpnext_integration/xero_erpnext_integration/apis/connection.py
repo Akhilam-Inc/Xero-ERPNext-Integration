@@ -1,48 +1,98 @@
 import frappe
 from .base import get_xero_client
-import json
 
 @frappe.whitelist()
-def test_xero_connection():
-    """Test Xero API connection"""
+def authorize():
+    """Exchange authorization code for access token"""
     try:
-        client = get_xero_client()
-        response = client.make_request("GET", "/Invoices")
+        # Get Xero Settings
+        settings = frappe.get_single("Xero Settings")
         
-        if response:
+        # Validate required fields
+        if not settings.code:
             return {
-                "status": "success",
-                "data": response
+                "status": "error",
+                "message": "Authorization code is missing. Please authorize again."
             }
-        else:
+        
+        if not settings.client_id or not settings.get_password("client_secret"):
             return {
                 "status": "error", 
-                "message": "No organisation data found"
+                "message": "Client ID or Client Secret is missing in Xero Settings."
             }
         
+        # Initialize client and exchange code for token
+        client = get_xero_client()
+        success = client.exchange_code_for_token()
+        
+        if success:
+            # Reload settings to get updated tokens
+            settings.reload()
+            
+            # Verify we got the access token
+            if settings.access_token:
+                # Test the connection to ensure tokens work
+                test_result = test_connection_simple()
+                
+                if test_result.get("status") == "success":
+                    # Clear the authorization code since it's been used
+                    frappe.db.set_value("Xero Settings", settings.name, "code", "")
+                    frappe.db.commit()
+                    
+                    return {
+                        "status": "success",
+                        "message": "Authorization successful! Connection established with Xero.",
+                        "data": {
+                            "access_token_exists": True,
+                            "tenant_id": settings.tenant_id,
+                            "tenant_name": settings.tenant_name,
+                            "organization": test_result.get("data", {})
+                        },
+                        "refresh_page": True  # Signal frontend to refresh
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
+                    }
+            else:
+                return {
+                    "status": "error",
+                    "message": "Authorization failed: Access token not received from Xero."
+                }
+        else:
+            return {
+                "status": "error",
+                "message": "Failed to exchange authorization code for access token. Please try authorizing again."
+            }
+            
     except Exception as e:
-        frappe.logger().error(f"Connection test failed: {str(e)}")
+        frappe.log_error(f"Xero Authorization Error: {str(e)}", "Xero Authorization")
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"Authorization error: {str(e)}"
         }
 
-@frappe.whitelist()
-def get_organisation_details():
-    """Get Xero organisation details"""
+def test_connection_simple():
+    """Simple connection test for authorization validation"""
     try:
         client = get_xero_client()
         response = client.make_request("GET", "/Organisation")
         
         if response and response.get("Organisations"):
+            org = response["Organisations"][0]
             return {
                 "status": "success",
-                "data": response["Organisations"][0]
+                "data": {
+                    "name": org.get("Name"),
+                    "country_code": org.get("CountryCode"),
+                    "currency_code": org.get("BaseCurrency")
+                }
             }
         else:
             return {
-                "status": "error", 
-                "message": "No organisation data found"
+                "status": "error",
+                "message": "No organisation data received"
             }
             
     except Exception as e:
@@ -50,19 +100,3 @@ def get_organisation_details():
             "status": "error",
             "message": str(e)
         }
-
-
-
-@frappe.whitelist()
-def authorize():
-    try:
-        client = get_xero_client()
-        response = client.exchange_code_for_token()
-
-        return {
-            "status": "success",
-            "message": "Authorization successful",
-            "data": response
-        }
-    except Exception as e:
-        frappe.log_error("Authorization Error", str(e))

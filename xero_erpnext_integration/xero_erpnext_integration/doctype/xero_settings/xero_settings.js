@@ -39,8 +39,17 @@ frappe.ui.form.on('Xero Settings', {
                                 message: __('Authorization Successful!'),
                                 indicator: 'green'
                             });
+                            
                             // Clean up URL parameters
                             window.history.replaceState({}, document.title, window.location.pathname);
+                            
+                            // Refresh page if requested by backend
+                            if (r.message.refresh_page) {
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 1500); // Short delay to show success message
+                            }
+                            
                             resolve();
                         } else {
                             frappe.msgprint({
@@ -107,7 +116,7 @@ function authorize(frm) {
             response_type: 'code',
             client_id: frm.doc.client_id,
             redirect_uri: frm.doc.redirect_uri,
-            scope: frm.doc.scope || 'openid profile email accounting.transactions',
+            scope: frm.doc.scope || 'openid profile email accounting.transactions offline_access accounting.contacts',
             state: state
         }).toString();
     
