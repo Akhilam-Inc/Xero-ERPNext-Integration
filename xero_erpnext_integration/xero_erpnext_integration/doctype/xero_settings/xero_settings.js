@@ -4,7 +4,8 @@ frappe.ui.form.on('Xero Settings', {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         
-        if (code && !frm.doc.code) {
+        // Always process new authorization codes from URL
+        if (code && code !== frm.doc.code) {
             handle_authorization_callback(frm, code, urlParams.get('scope'));
             return;
         }
@@ -24,37 +25,43 @@ frappe.ui.form.on('Xero Settings', {
         } else {
             frm.dashboard.add_indicator(__('Not Connected'), 'red');
         }
+    },
+
+    before_save: function(frm) {
+        // Process authorization if code and scope are present
+        if (frm.doc.code && frm.doc.scope && !frm.doc.access_token) {
+            return new Promise(function(resolve, reject) {
+                frappe.call({
+                    method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
+                    callback: function(r) {
+                        if (r.message && r.message.status === 'success') {
+                            frappe.show_alert({
+                                message: __('Authorization Successful!'),
+                                indicator: 'green'
+                            });
+                            // Clean up URL parameters
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            resolve();
+                        } else {
+                            frappe.msgprint({
+                                title: __('Connection Failed'),
+                                message: r.message ? r.message.message : 'Authorization failed',
+                                indicator: 'red'
+                            });
+                            resolve(); // Continue save even if authorization fails
+                        }
+                    }
+                });
+            });
+        }
     }
 });
 
 function handle_authorization_callback(frm, code, scope) {
-    // Set the authorization values and process immediately
+    // Set the authorization values and save to trigger before_save
     frm.set_value("code", code);
     frm.set_value("scope", scope);
-    
-    frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
-        callback: function(r) {
-            if (r.message && r.message.status === 'success') {
-                frm.set_value("enable", 1);
-                frm.save();
-                frappe.show_alert({
-                    message: __('Connection Successful!'),
-                    indicator: 'green'
-                });
-                // Clean up URL parameters
-                window.history.replaceState({}, document.title, window.location.pathname);
-            } else {
-                frm.set_value("enable", 0);
-                frm.save();
-                frappe.msgprint({
-                    title: __('Connection Failed'),
-                    message: r.message ? r.message.message : 'Authorization failed',
-                    indicator: 'red'
-                });
-            }
-        }
-    });
+    frm.save();
 }
 
 function sync_paid_invoices(frm) {
