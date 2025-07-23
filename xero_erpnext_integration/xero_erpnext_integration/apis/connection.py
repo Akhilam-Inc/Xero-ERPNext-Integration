@@ -26,21 +26,14 @@ def authorize():
         token_data = client.exchange_code_for_token()  # Returns token data or raises exception
         
         # If we reach here, the token exchange was successful
-        # Test the connection to ensure tokens work
-        test_result = test_connection_simple()
+        # Test the connection using the new tokens
+        test_result = test_connection_with_token(token_data["access_token"], token_data["tenant_id"])
         
         if test_result.get("status") == "success":
             return {
                 "status": "success",
                 "message": "Authorization successful! Connection established with Xero.",
-                "token_data": {
-                    "access_token": token_data["access_token"],
-                    "refresh_token": token_data["refresh_token"],
-                    "scope": token_data["scope"],
-                    "expires_in": token_data["expires_in"],
-                    "tenant_id": token_data["tenant_id"],
-                    "tenant_name": token_data["tenant_name"]
-                },
+                "token_data": token_data,
                 "organization": test_result.get("data", {}),
                 "save_required": True  # Signal frontend to save
             }
@@ -98,6 +91,43 @@ def test_connection_simple():
                 "message": "No organisation data received"
             }
             
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+def test_connection_with_token(access_token, tenant_id):
+    """Test connection with specific token and tenant"""
+    try:
+        import requests
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Xero-Tenant-Id": tenant_id,
+            "Accept": "application/json"
+        }
+        
+        response = requests.get("https://api.xero.com/api.xro/2.0/Organisation", headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("Organisations"):
+                org = data["Organisations"][0]
+                return {
+                    "status": "success",
+                    "data": {
+                        "name": org.get("Name"),
+                        "country_code": org.get("CountryCode"),
+                        "currency_code": org.get("BaseCurrency")
+                    }
+                }
+        
+        return {
+            "status": "error",
+            "message": f"Connection test failed: {response.status_code} - {response.text}"
+        }
+        
     except Exception as e:
         return {
             "status": "error",

@@ -63,27 +63,41 @@ async function process_authorization(frm) {
         
         // Authorization successful - update form with token data
         if (response.token_data) {
-            frm.set_value('access_token', response.token_data.access_token);
-            frm.set_value('refresh_token', response.token_data.refresh_token);
-            frm.set_value('scope', response.token_data.scope);
-            frm.set_value('tenant_id', response.token_data.tenant_id);
-            frm.set_value('tenant_name', response.token_data.tenant_name);
-            frm.set_value('enable', 1);
+            const tokenData = response.token_data;
+            console.log(tokenData)
             
-            // Calculate and set expiry time
-            if (response.token_data.expires_in) {
-                const expiryTime = new Date();
-                expiryTime.setSeconds(expiryTime.getSeconds() + response.token_data.expires_in);
-                frm.set_value('token_expires_at', expiryTime);
+            // Set all token fields
+            frm.doc.access_token = tokenData.access_token;
+            frm.doc.refresh_token = tokenData.refresh_token;
+            frm.doc.scope = tokenData.scope;
+            frm.doc.tenant_id = tokenData.tenant_id;
+            frm.doc.tenant_name = tokenData.tenant_name;
+            frm.doc.enable = 1;
+            
+            // Set expiry time from backend calculation
+            if (tokenData.expires_at) {
+                frm.doc.token_expires_at = tokenData.expires_at;
             }
+            
+            // Refresh form to show updated values
+            frm.refresh_fields();
+            
+            console.log('Token data set:', {
+                access_token: tokenData.access_token ? 'SET' : 'MISSING',
+                refresh_token: tokenData.refresh_token ? 'SET' : 'MISSING',
+                tenant_id: tokenData.tenant_id,
+                tenant_name: tokenData.tenant_name
+            });
         }
         
         // Save the form with all updated values
         await new Promise((resolve, reject) => {
             frm.save(null, function() {
+                console.log('Save successful');
                 resolve();
-            }, function() {
-                reject();
+            }, function(error) {
+                console.log('Save failed:', error);
+                reject(error);
             });
         });
         
@@ -102,6 +116,7 @@ async function process_authorization(frm) {
         }, 1500);
         
     } catch (error) {
+        console.log('Authorization error:', error);
         frappe.msgprint({
             title: __('Authorization Failed'),
             message: error.message || 'Authorization failed. Please try authorizing again.',

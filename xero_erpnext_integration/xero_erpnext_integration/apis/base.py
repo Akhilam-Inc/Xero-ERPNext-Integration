@@ -126,27 +126,41 @@ class XeroAPIClient:
                     frappe.log_error(f"No access token in response: {token_response}", "Xero Token Exchange")
                     raise Exception("No access token received from Xero")
                 
-                # Save tokens to settings
-                self.settings.access_token = token_response.get("access_token")
-                self.settings.refresh_token = token_response.get("refresh_token")
-                self.settings.scope = token_response.get("scope")
+                # Save tokens to settings object (but don't persist yet)
+                access_token = token_response.get("access_token")
+                refresh_token = token_response.get("refresh_token")
+                scope = token_response.get("scope")
+                expires_in = token_response.get("expires_in", 1800)
+                
+                self.settings.access_token = access_token
+                self.settings.refresh_token = refresh_token
+                self.settings.scope = scope
                 
                 # Calculate expiry time
-                expires_in = token_response.get("expires_in", 1800)  # Default 30 minutes
                 expires_at = datetime.now() + timedelta(seconds=expires_in)
                 self.settings.token_expires_at = expires_at
+                
+                # Update headers with new access token for tenant info call
+                self.access_token = access_token
+                self.headers["Authorization"] = f"Bearer {access_token}"
                 
                 # Get tenant information
                 self._get_and_save_tenant_info()
                 
+                # Ensure we got tenant information
+                if not self.settings.tenant_id:
+                    frappe.log_error("No tenant ID received from Xero connections", "Xero Token Exchange")
+                    raise Exception("Failed to get tenant information from Xero")
+                
                 frappe.log_error("Token exchange successful", "Xero Token Exchange Debug")
                 
-                # Return token data for caller to use
+                # Return complete token data
                 return {
-                    "access_token": token_response.get("access_token"),
-                    "refresh_token": token_response.get("refresh_token"),
-                    "scope": token_response.get("scope"),
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "scope": scope,
                     "expires_in": expires_in,
+                    "expires_at": expires_at.isoformat(),
                     "tenant_id": self.settings.tenant_id,
                     "tenant_name": self.settings.tenant_name
                 }
@@ -207,24 +221,39 @@ class XeroAPIClient:
     def _get_and_save_tenant_info(self):
         """Get tenant information and save to settings"""
         try:
-            # Update headers with new access token
-            self.access_token = self.settings.access_token
-            self.headers["Authorization"] = f"Bearer {self.access_token}"
+            # Headers should already be updated with access token in calling method
+            # Just ensure we have the authorization header
+            if "Authorization" not in self.headers or not self.access_token:
+                frappe.log_error("No access token available for tenant info request", "Xero Tenant Info")
+                return
             
             # Get connections (tenants)
+            frappe.log_error(f"Fetching tenant info from: {self.connections_url}", "Xero Tenant Info Debug")
             response = requests.get(self.connections_url, headers=self.headers)
+            
+            frappe.log_error(f"Tenant info response: {response.status_code}", "Xero Tenant Info Debug")
             
             if response.status_code == 200:
                 connections = response.json()
+                frappe.log_error(f"Received {len(connections) if connections else 0} tenant connections", "Xero Tenant Info Debug")
                 
                 if connections and len(connections) > 0:
                     # Use first connection as default
                     connection = connections[0]
-                    self.settings.tenant_id = connection.get("tenantId")
-                    self.settings.tenant_name = connection.get("tenantName")
+                    tenant_id = connection.get("tenantId")
+                    tenant_name = connection.get("tenantName")
                     
-                    # Update headers
-                    self.headers["Xero-Tenant-Id"] = self.settings.tenant_id
+                    self.settings.tenant_id = tenant_id
+                    self.settings.tenant_name = tenant_name
+                    
+                    # Update headers with tenant ID for future requests
+                    self.headers["Xero-Tenant-Id"] = tenant_id
+                    
+                    frappe.log_error(f"Set tenant: {tenant_name} ({tenant_id})", "Xero Tenant Info Debug")
+                else:
+                    frappe.log_error("No tenant connections available", "Xero Tenant Info")
+            else:
+                frappe.log_error(f"Failed to get tenant info: {response.status_code} - {response.text}", "Xero Tenant Info")
                     
         except Exception as e:
             frappe.log_error(f"Failed to get tenant info: {str(e)}", "Xero Tenant Info")
