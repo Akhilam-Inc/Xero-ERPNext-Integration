@@ -26,10 +26,10 @@ frappe.ui.form.on('Sales Invoice', {
             frappe.dom.unfreeze();
             if (frm.doc.custom_contact_id) {
                 resolve();
-            } else {
+            } else if(frm.doc.custom_do_not_sync_to_xero) {
                 let message = `Please confirm before submiting:<br><br>
-                Xero Contact Id is not found for this customer: ${frm.doc.customer}<br>
-                Do you still want to proceed without syncing invouce to Xero?<br><br>`;
+                Do not Sync is checked<br>
+                Do you still want to proceed without syncing invoice to Xero?<br><br>`;
                 frappe.confirm(
                     message,
                     () => {
@@ -39,10 +39,8 @@ frappe.ui.form.on('Sales Invoice', {
                     },
                     () => {
                         frappe.msgprint(`You can sync this invoice by following steps:<br><br>
-                        1. Go to Contact Master and add Customer Link If missing.<br>
-                        2. Click 'Sync to Zero' button in Contact.<br>
-                        3. Go to Sales Invoice and click 'Update Contact' button.<br>
-                        4. Click 'Submit' button in Sales Invoice.<br><br>`);
+                        1. Uncheck 'Do not Sync to Xero' checkbox in Sales Invoice.<br>
+                        2. Click on update contact button if contact id not set.<br>><br>`);
                         reject();
                     }
                 );
@@ -100,14 +98,16 @@ function show_contact_mapping_dialog(frm, xero_contacts, contact_person) {
     });
 
     let html = '<div style="max-height: 300px; overflow-y: auto;">';
-    xero_contacts.forEach(function(contact) {
+    xero_contacts.forEach(function(contact, index) {
         html += `
             <div style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px;">
                 <div><strong>${contact.Name || ''}</strong></div>
-                <div>Email: ${contact.EmailAddress || 'N/A'}</div>
-                <div>Phone: ${contact.Phones && contact.Phones[0] ? contact.Phones[0].PhoneNumber : 'N/A'}</div>
-                <button class="btn btn-primary btn-sm" 
-                        onclick="map_contact('${contact.ContactID}', '${frm.doc.contact_person}', '${frm.doc.name}')"
+                <div>Email: ${contact.EmailAddress || '-'}</div>
+                <div>Phone: ${contact.Phones && contact.Phones[0] ? contact.Phones[0].PhoneNumber : '-'}</div>
+                <button class="btn btn-primary btn-sm map-contact-btn" 
+                        data-contact-id="${contact.ContactID}"
+                        data-contact-person="${frm.doc.contact_person}"
+                        data-sales-invoice="${frm.doc.name}"
                         style="margin-top: 5px;">
                     Map Contact
                 </button>
@@ -117,6 +117,15 @@ function show_contact_mapping_dialog(frm, xero_contacts, contact_person) {
     html += '</div>';
 
     d.fields_dict.xero_contacts.$wrapper.html(html);
+    
+    // Add click event handlers
+    d.fields_dict.xero_contacts.$wrapper.find('.map-contact-btn').on('click', function() {
+        const contactId = $(this).data('contact-id');
+        const contactPerson = $(this).data('contact-person');
+        const salesInvoice = $(this).data('sales-invoice');
+        map_contact(contactId, contactPerson, salesInvoice);
+        d.hide();
+    });
     d.show();
 }
 
