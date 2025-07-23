@@ -405,6 +405,19 @@ def create_contact_and_map(contact_person, sales_invoice):
         # Get contact details from ERPNext
         contact_doc = frappe.get_doc("Contact", contact_person)
         
+        # Check customer and supplier links
+        is_customer = False
+        is_supplier = False
+        
+        if hasattr(contact_doc, 'links') and contact_doc.links:
+            for link in contact_doc.links:
+                if link.link_doctype == "Customer":
+                    is_customer = True
+                if link.link_doctype == "Supplier":
+                    is_supplier = True
+        
+        frappe.log_error(f"Contact {contact_person} - IsCustomer: {is_customer}, IsSupplier: {is_supplier}, Links: {[(link.link_doctype, link.link_name) for link in contact_doc.links] if contact_doc.links else 'No links'}", "Debug Contact Links")
+        
         # Create contact in Xero
         client = get_xero_client()
         contact_data = {
@@ -413,8 +426,8 @@ def create_contact_and_map(contact_person, sales_invoice):
             "LastName": contact_doc.last_name or "",
             "EmailAddress": contact_doc.email_id or "",
             "AccountNumber": contact_doc.custom_account_number or contact_doc.name,
-            "IsCustomer": any(link.link_doctype == "Customer" for link in contact_doc.links),
-            "IsSupplier": any(link.link_doctype == "Supplier" for link in contact_doc.links),
+            "IsCustomer": is_customer,
+            "IsSupplier": is_supplier,
             "Addresses": [
                 {
                     "AddressType": "STREET",
