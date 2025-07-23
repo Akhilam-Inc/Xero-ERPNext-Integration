@@ -3,41 +3,58 @@ from frappe import _
 
 def before_submit(doc, method=None):
     """Validate before submitting Sales Invoice"""
-    # If contact ID exists, allow submission
-    if doc.custom_contact_id:
-        return
-    
-    # If do not sync to xero is checked, allow submission
+    # Skip validation if sync is disabled
     if doc.custom_do_not_sync_to_xero:
         return
     
-    # If no contact ID and sync is required, throw validation error
-    if doc.customer and doc.contact_person and not doc.custom_contact_id and not doc.custom_do_not_sync_to_xero:
-        frappe.throw(_(
-            "Xero Contact ID is not found for this customer: {0}<br><br>"
-            "Please follow these steps:<br>"
-            "1. Click on update contact to get contact id."
-        ))
-    elif not doc.customer and not doc.contact_person and not doc.custom_do_not_sync_to_xero:
+    # Check if contact ID exists
+    if doc.custom_contact_id:
+        return
+    
+    # Validate required fields for Xero integration
+    if not doc.customer or not doc.contact_person:
         frappe.throw(_(
             "Customer and Contact Person are required for Xero integration.<br>"
-            "Please set Customer and Contact Person or check 'Do not Sync to Xero' to proceed."
+            "Please set these fields or check 'Do not Sync to Xero' to proceed."
         ))
+    
+    # Contact ID missing but required fields present
+    frappe.throw(_(
+        "Xero Contact ID is not found for customer: {0}<br><br>"
+        "Please click the 'Update Contact' button to map or create the contact in Xero."
+    ).format(doc.customer))
 
 def on_submit(doc, method=None):
-    from xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice import create_invoice
-
-    invoice_data = create_invoice(doc.name)
-    if invoice_data:
-        frappe.db.set_value("Sales Invoice", doc.name, "custom_xero_invoice_number", invoice_data.get("data").get("InvoiceID"))
-        doc.reload()
-        frappe.msgprint(
-            _("Invoice created successfully in Xero"),
-            title=_("Success"),
-            indicator="green"
-        )
-    else:
-        frappe.throw(_("Error creating invoice in Xero"))
+    """Create invoice in Xero after submission"""
+    # Skip if sync is disabled
+    if doc.custom_do_not_sync_to_xero:
+        return
+    
+    try:
+        from xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice import create_invoice
+        
+        result = create_invoice(doc.name)
+        
+        if result and result.get("status") == "success":
+            # Update invoice with Xero ID
+            xero_invoice_id = result.get("data", {}).get("InvoiceID")
+            if xero_invoice_id:
+                frappe.db.set_value("Sales Invoice", doc.name, "custom_xero_invoice_number", xero_invoice_id)
+                frappe.db.commit()
+                
+                frappe.msgprint(
+                    _("Invoice created successfully in Xero"),
+                    title=_("Success"),
+                    indicator="green"
+                )
+        else:
+            error_msg = result.get("message", "Unknown error") if result else "No response from Xero"
+            frappe.log_error(f"Failed to create invoice {doc.name} in Xero: {error_msg}", "Xero Create Invoice")
+            frappe.throw(_("Failed to create invoice in Xero: {0}").format(error_msg))
+            
+    except Exception as e:
+        frappe.log_error(f"Error creating invoice {doc.name} in Xero: {str(e)}", "Xero Create Invoice")
+        frappe.throw(_("Error creating invoice in Xero: {0}").format(str(e)))
 
 
 def on_cancel(doc, method=None):
