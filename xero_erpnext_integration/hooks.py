@@ -66,6 +66,8 @@ scheduler_events = {
 doc_events = {
     "Sales Invoice": {
         "on_submit": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit",
+        "on_cancel": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_cancel",
+        "before_submit": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.before_submit",
     }
 }
 
