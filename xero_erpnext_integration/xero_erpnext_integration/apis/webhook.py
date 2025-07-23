@@ -171,8 +171,13 @@ def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
             return
         
         # Create payment entry using existing API
+        # Convert sales_invoice dict to object-like structure for API compatibility
+        from types import SimpleNamespace
+        invoice_obj = SimpleNamespace(**sales_invoice)
+        frappe.log_error("Xero Webhook", f"Invoice Object: {invoice_obj}")
+        
         payment_result = create_payment_entry_from_xero(
-            sales_invoice, 
+            invoice_obj, 
             xero_invoice, 
             amount_paid
         )
