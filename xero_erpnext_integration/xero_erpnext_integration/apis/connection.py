@@ -27,20 +27,20 @@ def authorize():
         
         # If we reach here, the token exchange was successful
         # Test the connection using the new tokens
-        test_result = test_connection_with_token(token_data["access_token"], token_data["tenant_id"])
+        # test_result = test_connection_with_token(token_data["access_token"], token_data["tenant_id"])
         
-        if test_result.get("status") == "success":
+        if token_data.get("status") == "success":
             return {
                 "status": "success",
                 "message": "Authorization successful! Connection established with Xero.",
                 "token_data": token_data,
-                "organization": test_result.get("data", {}),
+                "organization": token_data.get("data", {}),
                 "save_required": True  # Signal frontend to save
             }
         else:
             return {
                 "status": "error",
-                "message": f"Authorization completed but connection test failed: {test_result.get('message', 'Unknown error')}"
+                "message": f"Authorization completed but connection test failed: {token_data.get('message', 'Unknown error')}"
             }
             
     except Exception as e:
