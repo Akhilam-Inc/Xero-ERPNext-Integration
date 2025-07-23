@@ -19,11 +19,13 @@ def webhook():
         elif request.method == "POST":
             return handle_webhook_event()
         
-        return '', 405  # Method not allowed
+        frappe.local.response.http_status_code = 405
+        return "Method Not Allowed"
         
     except Exception as e:
         frappe.log_error(f"Xero Webhook Error: {str(e)}", "Xero Webhook Handler")
-        return '', 500
+        frappe.local.response.http_status_code = 500
+        return "Internal Server Error"
 
 def handle_intent_to_receive():
     """Handle Xero's intent to receive challenge (GET request)"""
@@ -33,7 +35,8 @@ def handle_intent_to_receive():
         # Get the challenge parameter from query string
         challenge = request.args.get('challenge')
         if not challenge:
-            return '', 400
+            frappe.local.response.http_status_code = 400
+            return "Bad Request"
         
         # Return the challenge value as response with 200 status
         frappe.local.response.update({
@@ -44,7 +47,8 @@ def handle_intent_to_receive():
         
     except Exception as e:
         frappe.log_error(f"Error handling intent to receive: {str(e)}", "Xero Webhook")
-        return '', 500
+        frappe.local.response.http_status_code = 500
+        return "Internal Server Error"
 
 def handle_webhook_event():
     """Handle actual webhook events (POST request)"""
@@ -56,13 +60,15 @@ def handle_webhook_event():
         # Verify webhook signature
         provided_signature = request.headers.get('X-Xero-Signature')
         if not provided_signature:
-            return '', 401
+            frappe.local.response.http_status_code = 401
+            return "Unauthorized"
 
         hashed = hmac.new(bytes(webhook_key, 'utf8'), request.data, hashlib.sha256)
         generated_signature = base64.b64encode(hashed.digest()).decode('utf-8')
         
         if not hmac.compare_digest(provided_signature, generated_signature):
-            return '', 401
+            frappe.local.response.http_status_code = 401
+            return "Unauthorized"
 
         # Process webhook payload
         req_data = request.json()
@@ -70,11 +76,13 @@ def handle_webhook_event():
             for event in req_data['events']:
                 process_webhook_event(event)
         
-        return '', 200
+        frappe.local.response.http_status_code = 200
+        return "OK"
         
     except Exception as e:
         frappe.log_error(f"Error handling webhook event: {str(e)}", "Xero Webhook Handler")
-        return '', 500
+        frappe.local.response.http_status_code = 500
+        return "Internal Server Error"
 
 def process_webhook_event(event):
     """Process individual webhook event"""
