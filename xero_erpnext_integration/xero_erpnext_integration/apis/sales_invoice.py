@@ -139,7 +139,61 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         
         # Set accounts
         company_doc = frappe.get_doc("Company", sales_invoice.company)
-        payment_entry.paid_to = company_doc.default_cash_account or company_doc.default_bank_account
+        
+        # Get the default cash account for the company
+        paid_to_account = None
+        if hasattr(company_doc, 'default_cash_account') and company_doc.default_cash_account:
+            paid_to_account = company_doc.default_cash_account
+        elif hasattr(company_doc, 'default_bank_account') and company_doc.default_bank_account:
+            paid_to_account = company_doc.default_bank_account
+        else:
+            # Fallback: find the first cash/bank account for this company
+            cash_accounts = frappe.get_all("Account", 
+                filters={
+                    "company": sales_invoice.company,
+                    "account_type": ["in", ["Cash", "Bank"]],
+                    "is_group": 0
+                },
+                fields=["name"],
+                limit=1
+            )
+            if cash_accounts:
+                paid_to_account = cash_accounts[0].name
+        
+        if not paid_to_account:
+            return {
+                "status": "error",
+                "message": f"No cash/bank account found for company {sales_invoice.company}"
+            }
+        
+        payment_entry.paid_to = paid_to_account
+        
+        # Get customer's receivable account
+        customer_doc = frappe.get_doc("Customer", sales_invoice.customer)
+        if hasattr(customer_doc, 'accounts') and customer_doc.accounts:
+            for acc in customer_doc.accounts:
+                if acc.company == sales_invoice.company:
+                    payment_entry.paid_from = acc.account
+                    break
+        
+        if not payment_entry.paid_from:
+            # Fallback to default receivable account
+            receivable_accounts = frappe.get_all("Account",
+                filters={
+                    "company": sales_invoice.company,
+                    "account_type": "Receivable",
+                    "is_group": 0
+                },
+                fields=["name"],
+                limit=1
+            )
+            if receivable_accounts:
+                payment_entry.paid_from = receivable_accounts[0].name
+            else:
+                return {
+                    "status": "error", 
+                    "message": f"No receivable account found for company {sales_invoice.company}"
+                }
         
         # Add reference to the Sales Invoice
         payment_entry.append("references", {
