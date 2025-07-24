@@ -597,17 +597,32 @@ bench install-app xero_erpnext_integration --site your-site-name</code></pre>
                     
                     <h4>From Frappe/ERPNext to Xero</h4>
                     <ul>
-                        <li>Customer name and contact details</li>
+                        <li>Create Contact for customer to sync with Xero</li>
                         <li>Sales Invoice</li>
+                        <li>Cancel Sales Invoice</li>
                         <!-- <li>Billing and shipping addresses</li>
                         <li>Payment terms</li>
                         <li>Credit limits</li>
                         <li>Custom fields (configurable)</li> -->
                     </ul>
 
+                    <div class="alert alert-info">
+                        <strong>Usage:</strong>
+                        <ol>
+                            <li>Create contact in contact page, check secnd to Xero box, then click on <button class="btn">Send to Xero</button></li>
+                            <li>To also create Contact ion sales invoice, click <button class="btn">Sync Contact in Xero</button></li>
+                            <li>On Submit of Sales Invoice, If <strong>Do not Sync to Xero</strong> is checked, it will not be synced to Xero for payment</li>
+                            <li>Check the <strong>Xero API Log</strong> for api status</li>
+                            <li>Confirm Sales Invoice in Xero, if <strong>Do not Sync to Xero</strong> is uncheckked</li>
+                            <li>Cancel Sales Invoice in Frappe/Erpnext, if successful, then confirm in Xero.</li>
+                        </ol>
+                    </div>
+
                     <h4>From Xero to Frappe/ERPNext</h4>
                     <ul>
                         <li>Payment Entries</li>
+                        <li>Void Sales Invoice</li>
+                        <li>Create Contact to sync with Erpnext</li>
                         <!-- <li>Address changes</li>
                         <li>Payment term modifications</li> -->
                     </ul>
@@ -620,6 +635,7 @@ bench install-app xero_erpnext_integration --site your-site-name</code></pre>
                             <li>Make payment for sales invoice in Xero</li>
                             <li>Check the <strong>Xero API Log</strong> for api status</li>
                             <li>Confirm sales invoice paid after payment in xero</li>
+                            <li>If sales invoice is voided in xero, also confirm its reflected.</li>
                             <li>Check the <strong>Xero Payment Scheduler</strong> for sync status</li>
                         </ol>
                     </div>

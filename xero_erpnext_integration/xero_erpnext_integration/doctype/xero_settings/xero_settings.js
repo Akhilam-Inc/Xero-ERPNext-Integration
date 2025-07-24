@@ -1,47 +1,22 @@
 frappe.ui.form.on('Xero Settings', {
     refresh: function(frm) {
-		const urlParams = new URLSearchParams(window.location.search);
-		const code = urlParams.get('code');
-		if (code) {
-            console.log(code)
-			frm.set_value("code", code)
-            frm.set_value("scope", urlParams.get('scope'))
-			frm.save()
-		}
-        // Add custom buttons
+        // Handle authorization callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
         
+        // Always process new authorization codes from URL
+        if (code && code !== frm.doc.code) {
+            handle_authorization_callback(frm, code, urlParams.get('scope'));
+            return;
+        }
+
+        // Add custom buttons
         frm.add_custom_button(__('Authorize'), function() {
             authorize(frm);
         });
-        
-        // frm.add_custom_button(__('Test Webhook'), function() {
-        //     frappe.call({
-        //         method: 'xero_erpnext_integration.xero_erpnext_integration.apis.webhook_handler.test_webhook',
-        //         callback: function(r) {
-        //             if (r.message) {
-        //                 if (r.message.status === 'success') {
-        //                    frappe.show_alert("Webhook Tested Successfully", 5)
-        //                 } else {
-        //                     frappe.show_alert("Error Testing Webhook", 5)
-        //                 }
-        //             }
-        //         }
-        //     });
-        // });
 
         frm.add_custom_button(__('Sync Paid Invoices'), function() {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments',
-                callback: function(r) {
-                    if (r.message) {
-                        if (r.message.status === 'success') {
-                           frappe.show_alert("Paid Invoices Synced Successfully", 5)
-                        } else {
-                            frappe.show_alert("Error Syncing Paid Invoices", 5)
-                        }
-                    }
-                }
-            });
+            sync_paid_invoices(frm);
         });
         
         // Show connection status
@@ -50,91 +25,119 @@ frappe.ui.form.on('Xero Settings', {
         } else {
             frm.dashboard.add_indicator(__('Not Connected'), 'red');
         }
-    },
-	before_save: function(frm) {
-		// if(frm.doc.enable){
-		// 	test_xero_connection(frm);
-		// }
-		// else{
-		// 	frappe.show_alert("Please enable the integration to test the connection.");
-		// }
+    }
+});
 
-        if(frm.doc.code && frm.doc.scope){
+function handle_authorization_callback(frm, code, scope) {
+    // Set the authorization values and process immediately
+    frm.set_value("code", code);
+    frm.set_value("scope", scope);
+    
+    // Process authorization with async/await
+    process_authorization(frm);
+}
+
+async function process_authorization(frm) {
+    if (frm._authorizing) {
+        return;
+    }
+    frm._authorizing = true;
+        // Call authorization API and wait for completion
+        const response = await new Promise((resolve, reject) => {
             frappe.call({
                 method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.authorize',
                 callback: function(r) {
-                    if (r.message) {
-                        if (r.message.status === 'success') {
-                            // window.location.reload()
-                            frappe.msgprint({
-                                title: __('Connection Successful'),
-                                message: r.message.message,
-                                indicator: 'green'
-                            });
-                            frm.set_value("enable", 1)
-                        } else {
-                            frm.set_value("enable", 0)
-                            frappe.msgprint({
-                                title: __('Connection Failed'),
-                                message: r.message.message,
-                                indicator: 'red'
-                            });
-                        }
+                    if (r.message && r.message.status === 'success') {
+                        resolve(r.message);
+                    } else {
+                        reject(r.message);
                     }
+                },
+                error: function(r) {
+                    reject({ message: 'Network error during authorization. Please try again.' });
                 }
             });
-        }
-		
-	}
-});
-
-function test_xero_connection(frm) {
-    frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.test_xero_connection',
-        callback: function(r) {
-            if (r.message) {
-                if (r.message.status === 'success') {
-                    frappe.msgprint({
-                        title: __('Connection Successful'),
-                        message: r.message.message,
-                        indicator: 'green'
-                    });
-                } else {
-					frm.set_value("enable", 0)
-                    frappe.msgprint({
-                        title: __('Connection Failed'),
-                        message: r.message.message,
-                        indicator: 'red'
-                    });
-                }
-            }
-        }
-    });
-}
-
-function get_organisation_info(frm) {
-    frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.connection.get_organisation_details',
-        callback: function(r) {
-            if (r.message && r.message.status === 'success') {
-                let org = r.message.data;
-                let msg = `
-                    <b>Organisation:</b> ${org.Name}<br>
-                    <b>Country:</b> ${org.CountryCode}<br>
-                    <b>Currency:</b> ${org.BaseCurrency}<br>
-                    <b>Financial Year End:</b> ${org.FinancialYearEndDay}/${org.FinancialYearEndMonth}<br>
-                    <b>Tax Number:</b> ${org.TaxNumber || 'Not set'}
-                `;
-                
-                frappe.msgprint({
-                    title: __('Organisation Information'),
-                    message: msg,
-                    indicator: 'blue'
+        });
+        
+        // Authorization successful - update form with token data
+        let authorizationSuccessful = false;
+        
+        if (response.token_data) {
+            const tokenData = response.token_data;
+            console.log(tokenData)
+            
+            // Check if we actually received an access token
+            if (!tokenData.access_token) {
+                frappe.show_alert({
+                    message: __('Authorization failed: No access token received from Xero'),
+                    indicator: 'red'
                 });
             } else {
-                frappe.msgprint({
-                    title: __('Error'),
-                    message: r.message ? r.message.message : 'Failed to get organisation info',
+                // Set all token fields
+                frm.doc.access_token = tokenData.access_token;
+                frm.doc.refresh_token = tokenData.refresh_token;
+                frm.doc.scope = tokenData.scope;
+                frm.doc.tenant_id = tokenData.tenant_id;
+                frm.doc.tenant_name = tokenData.tenant_name;
+                frm.doc.enable = 1;
+                
+                // Set expiry time from backend calculation
+                if (tokenData.expires_at) {
+                    frm.doc.token_expires_at = tokenData.expires_at;
+                }
+                
+                // Refresh form to show updated values
+                frm.refresh_fields();
+                authorizationSuccessful = true;
+            }
+        } else {
+            // No token data received at all
+            frappe.show_alert({
+                message: __('Authorization failed: No token data received from Xero'),
+                indicator: 'red'
+            });
+        }
+        
+        // Save the form with all updated values (regardless of success/failure)
+        await new Promise((resolve, reject) => {
+            frm.save(null, function() {
+                console.log('Save successful');
+                resolve();
+            }, function(error) {
+                console.log('Save failed:', error);
+                reject(error);
+            });
+        });
+        
+        // Show appropriate message based on authorization result
+        if (authorizationSuccessful) {
+            frappe.show_alert({
+                message: __('Authorization Successful!'),
+                indicator: 'green'
+            });
+        }
+        
+        // Clean up URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Refresh page to show updated status
+        setTimeout(function() {
+            window.location.reload();
+        }, 1500);
+}
+
+function sync_paid_invoices(frm) {
+    frappe.call({
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments',
+        callback: function(r) {
+            if (r.message && r.message.status === 'success') {
+                frappe.show_alert({
+                    message: __('Paid Invoices Synced Successfully'),
+                    indicator: 'green'
+                });
+            } else {
+                frappe.show_alert({
+                    message: __('Error Syncing Paid Invoices'),
                     indicator: 'red'
                 });
             }
@@ -142,31 +145,10 @@ function get_organisation_info(frm) {
     });
 }
 
-function sync_pending_invoices(frm) {
-    frappe.confirm(
-        'This will sync all pending invoices to Xero. Continue?',
-        function() {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.invoice_sync.sync_all_pending_invoices',
-                callback: function(r) {
-                    if (r.message) {
-                        frappe.msgprint({
-                            title: __('Sync Result'),
-                            message: r.message.message,
-                            indicator: r.message.status === 'success' ? 'green' : 'orange'
-                        });
-                    }
-                }
-            });
-        }
-    );
-}
-
 function authorize(frm) {
-    // Check if required fields are filled
+    // Validate required fields
     if (!frm.doc.client_id) {
-        frappe.msgprint({
-            title: __('Missing Client ID'),
+        frappe.show_alert({
             message: __('Please enter the Client ID before authorizing.'),
             indicator: 'red'
         });
@@ -174,37 +156,34 @@ function authorize(frm) {
     }
     
     if (!frm.doc.redirect_uri) {
-        frappe.msgprint({
-            title: __('Missing Redirect URI'),
+        frappe.show_alert({
             message: __('Please enter the Redirect URI before authorizing.'),
             indicator: 'red'
         });
         return;
     }
     
-    // Build authorization URL with parameters from form
-    const baseUrl = 'https://login.xero.com/identity/connect/authorize';
-    const params = new URLSearchParams({
-        response_type: 'code',
-        client_id: frm.doc.client_id,
-        redirect_uri: frm.doc.redirect_uri,
-        scope: frm.doc.scope || 'openid profile email accounting.transactions',
-        state: frm.doc.state || Math.random().toString(36).substring(2, 15)
-    });
-    
-    const authUrl = `${baseUrl}?${params.toString()}`;
-    
-    // Save the state value to the document for verification later
+    // Generate state if not exists
+    const state = frm.doc.state || Math.random().toString(36).substring(2, 15);
     if (!frm.doc.state) {
-        frm.set_value('state', params.get('state'));
+        frm.set_value('state', state);
     }
     
-    // Open authorization URL in new window/tab
+    // Build authorization URL
+    const authUrl = 'https://login.xero.com/identity/connect/authorize?' + 
+        new URLSearchParams({
+            response_type: 'code',
+            client_id: frm.doc.client_id,
+            redirect_uri: frm.doc.redirect_uri,
+            scope: frm.doc.scope || 'openid profile email accounting.transactions offline_access accounting.contacts',
+            state: state
+        }).toString();
+    
+    // Open authorization window
     window.open(authUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
     
     frappe.show_alert({
-        message: __('Authorization window opened. Please complete the authorization process.'),
+        message: __('Complete the authorization in the opened window'),
         indicator: 'blue'
     });
 }
-

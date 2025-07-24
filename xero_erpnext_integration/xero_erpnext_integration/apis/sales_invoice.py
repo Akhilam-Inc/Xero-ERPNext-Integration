@@ -1,40 +1,7 @@
 import frappe
 from .base import get_xero_client
-import json
-import time
 from datetime import datetime
-from frappe.utils import today, get_datetime, flt
-
-today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-today_ms = int(today.timestamp() * 1000)
-today_date_param = f"/Date({today_ms}+0000)/"
-
-@frappe.whitelist()
-def get_specific_invoices():
-    unpaid_invoices = frappe.get_all("Sales Invoice", 
-        filters={
-            "custom_xero_invoice_number": ["is", "set"],
-            "status": ["=", "Unpaid"]
-        },
-        fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number"]
-    )
-    invoice_names = ",".join([invoice.custom_xero_invoice_number for invoice in unpaid_invoices]) if unpaid_invoices else ""
-    
-    try:
-        client = get_xero_client()
-        response = client.make_request("GET", f"/invoices?IDs={invoice_names}&Statuses=PAID&summaryOnly=True")
-        
-        return {
-            "status": "success",
-            "data": response.get("Invoices", [])
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
+from frappe.utils import flt
 
 @frappe.whitelist()
 def sync_invoice_payments():
@@ -70,7 +37,6 @@ def sync_invoice_payments():
             invoice_id = xero_invoice.get("InvoiceID")
             status = xero_invoice.get("Status")
             amount_paid = flt(xero_invoice.get("AmountPaid", 0))
-            total_amount = flt(xero_invoice.get("Total", 0))
             
             # Find corresponding ERPNext invoice
             erpnext_invoice = None
@@ -91,9 +57,7 @@ def sync_invoice_payments():
                 )
                 processed_invoices.append({
                     "invoice": erpnext_invoice.name,
-                    # "xero_id": invoice_id,
                     "amount_paid": amount_paid,
-                    # "payment_result": payment_result
                 })
         
         return {
@@ -108,7 +72,6 @@ def sync_invoice_payments():
             "status": "error",
             "message": str(e)
         }
-
 
 def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
     """Create payment entry in ERPNext based on Xero payment data"""
@@ -176,11 +139,61 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         
         # Set accounts
         company_doc = frappe.get_doc("Company", sales_invoice.company)
-        payment_entry.paid_to = company_doc.default_cash_account or company_doc.default_bank_account
-        # payment_entry.paid_from = company_doc.default_bank_account or frappe.get_value("Customer", sales_invoice.customer, "default_receivable_account")
         
-        # if not payment_entry.paid_from:
-        #     payment_entry.paid_from = company_doc.default_receivable_account
+        # Get the default cash account for the company
+        paid_to_account = None
+        if hasattr(company_doc, 'default_cash_account') and company_doc.default_cash_account:
+            paid_to_account = company_doc.default_cash_account
+        elif hasattr(company_doc, 'default_bank_account') and company_doc.default_bank_account:
+            paid_to_account = company_doc.default_bank_account
+        else:
+            # Fallback: find the first cash/bank account for this company
+            cash_accounts = frappe.get_all("Account", 
+                filters={
+                    "company": sales_invoice.company,
+                    "account_type": ["in", ["Cash", "Bank"]],
+                    "is_group": 0
+                },
+                fields=["name"],
+                limit=1
+            )
+            if cash_accounts:
+                paid_to_account = cash_accounts[0].name
+        
+        if not paid_to_account:
+            return {
+                "status": "error",
+                "message": f"No cash/bank account found for company {sales_invoice.company}"
+            }
+        
+        payment_entry.paid_to = paid_to_account
+        
+        # Get customer's receivable account
+        customer_doc = frappe.get_doc("Customer", sales_invoice.customer)
+        if hasattr(customer_doc, 'accounts') and customer_doc.accounts:
+            for acc in customer_doc.accounts:
+                if acc.company == sales_invoice.company:
+                    payment_entry.paid_from = acc.account
+                    break
+        
+        if not payment_entry.paid_from:
+            # Fallback to default receivable account
+            receivable_accounts = frappe.get_all("Account",
+                filters={
+                    "company": sales_invoice.company,
+                    "account_type": "Receivable",
+                    "is_group": 0
+                },
+                fields=["name"],
+                limit=1
+            )
+            if receivable_accounts:
+                payment_entry.paid_from = receivable_accounts[0].name
+            else:
+                return {
+                    "status": "error", 
+                    "message": f"No receivable account found for company {sales_invoice.company}"
+                }
         
         # Add reference to the Sales Invoice
         payment_entry.append("references", {
@@ -206,90 +219,6 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
             "message": str(e)
         }
 
-
-@frappe.whitelist()
-def check_invoice_payment_status(sales_invoice_name):
-    """Check payment status of a specific invoice in Xero"""
-    try:
-        # Get the Sales Invoice
-        sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
-        
-        if not sales_invoice.custom_xero_invoice_number:
-            return {
-                "status": "error",
-                "message": "No Xero invoice number found"
-            }
-        
-        # Get invoice details from Xero
-        client = get_xero_client()
-        response = client.make_request("GET", f"/invoices/{sales_invoice.custom_xero_invoice_number}")
-        
-        if not response or "Invoices" not in response:
-            return {
-                "status": "error",
-                "message": "Invoice not found in Xero"
-            }
-        
-        xero_invoice = response["Invoices"][0]
-        
-        return {
-            "status": "success",
-            "data": {
-                "invoice_id": xero_invoice.get("InvoiceID"),
-                "status": xero_invoice.get("Status"),
-                "total": xero_invoice.get("Total"),
-                "amount_paid": xero_invoice.get("AmountPaid"),
-                "amount_due": xero_invoice.get("AmountDue"),
-                "is_paid": xero_invoice.get("Status") == "PAID",
-                "is_partially_paid": flt(xero_invoice.get("AmountPaid", 0)) > 0 and xero_invoice.get("Status") != "PAID"
-            }
-        }
-        
-    except Exception as e:
-        frappe.log_error("Xero Payment Status Check", f"Error checking payment status: {str(e)}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-
-@frappe.whitelist()
-def get_xero_invoices():
-    """Get Xero invoices"""
-    try:
-        client = get_xero_client()
-        response = client.make_request("GET", "/Invoices")
-        
-        return {
-            "status": "success",
-            "data": response.get("Invoices", [])
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-def get_invoice(invoice_id):
-        """Get invoice from Xero"""
-        try:
-            client = get_xero_client()
-            response = client.make_request("GET", f"Invoices/{invoice_id}")
-            
-            if response and "Invoices" in response:
-                return {
-                    "status": "success",
-                    "data": response["Invoices"][0]
-                }
-            
-            return None
-            
-        except Exception as e:
-            frappe.log_error("Xero Get Invoice", f"Failed to get invoice: {str(e)}")
-            return None
-
-
 @frappe.whitelist() 
 def create_invoice(doc, method=None):
     """Create invoice in Xero"""
@@ -314,7 +243,7 @@ def create_invoice(doc, method=None):
                 "Description": item.description or item.item_name,
                 "Quantity": str(item.qty),
                 "UnitAmount": str(item.rate),
-                "AccountCode": item.get("custom_account_code") or "200",  # Default to 200 if not set
+                "AccountCode": item.get("custom_account_code") or "200",
             }
             
             # Add discount rate if available
@@ -325,16 +254,17 @@ def create_invoice(doc, method=None):
         
         # Prepare invoice data
         invoice_data = {
-            "Type": "ACCREC",  # Accounts Receivable
+            "Type": "ACCREC",
             "Contact": {
                 "ContactID": contact_id
             },
+            "InvoiceNumber": invoice.name,  # Use Sales Invoice name as invoice number
             "DateString": invoice.posting_date.strftime("%Y-%m-%d") if invoice.posting_date else None,
             "DueDateString": invoice.due_date.strftime("%Y-%m-%d") if invoice.due_date else None,
-            "LineAmountTypes": "Exclusive",  # Tax exclusive
+            "LineAmountTypes": "Exclusive",
             "LineItems": line_items,
-            "Reference": invoice.name,  # ERPNext invoice reference
-            "Status": "AUTHORISED"  # Create as draft initially
+            "Reference": invoice.name,
+            "Status": "AUTHORISED"
         }
         
         # Add currency if different from base currency
@@ -346,10 +276,6 @@ def create_invoice(doc, method=None):
         
         if response and "Invoices" in response:
             xero_invoice = response["Invoices"][0]
-            
-            # Update ERPNext Sales Invoice with Xero Invoice ID
-            # frappe.db.set_value("Sales Invoice", invoice.name, "custom_xero_invoice_number", xero_invoice.get("InvoiceID"))
-            # frappe.db.commit()
             
             return {
                 "status": "success",
@@ -365,8 +291,6 @@ def create_invoice(doc, method=None):
     except Exception as e:
         frappe.log_error("Xero Create Invoice", f"Failed to create invoice in Xero: {str(e)}")
         frappe.throw(f"Failed to create invoice in Xero: {str(e)}")
-
-
 
 @frappe.whitelist()
 def fetch_xero_contacts(contact_person):
@@ -397,7 +321,6 @@ def fetch_xero_contacts(contact_person):
         frappe.log_error(f"Failed to fetch Xero contacts: {str(e)}", "Fetch Xero Contacts")
         return []
 
-
 @frappe.whitelist()
 def create_contact_and_map(contact_person, sales_invoice):
     """Create contact in Xero using ERPNext contact details and map it"""
@@ -415,8 +338,6 @@ def create_contact_and_map(contact_person, sales_invoice):
                     is_customer = True
                 if link.link_doctype == "Supplier":
                     is_supplier = True
-        
-        frappe.log_error(f"Contact {contact_person} - IsCustomer: {is_customer}, IsSupplier: {is_supplier}, Links: {[(link.link_doctype, link.link_name) for link in contact_doc.links] if contact_doc.links else 'No links'}", "Debug Contact Links")
         
         # Create contact in Xero
         client = get_xero_client()
@@ -470,7 +391,6 @@ def create_contact_and_map(contact_person, sales_invoice):
             "message": str(e)
         }
 
-
 @frappe.whitelist()
 def map_contact_to_xero(contact_id, contact_person, sales_invoice):
     """Map contact to Xero by setting contact_id in Contact and Sales Invoice"""
@@ -492,10 +412,63 @@ def map_contact_to_xero(contact_id, contact_person, sales_invoice):
         frappe.log_error(f"Failed to map contact: {str(e)}", "Map Contact to Xero")
         return False
 
+@frappe.whitelist()
+def cancel_invoice_in_xero(xero_invoice_id):
+    """Cancel/void an invoice in Xero"""
+    try:
+        client = get_xero_client()
+        
+        # First, get the current invoice to check its status
+        response = client.make_request("GET", f"/Invoices/{xero_invoice_id}")
+        
+        if not response or "Invoices" not in response:
+            return {
+                "status": "error",
+                "message": "Invoice not found in Xero"
+            }
+        
+        current_invoice = response["Invoices"][0]
+        current_status = current_invoice.get("Status")
+        
+        # Check if invoice can be voided
+        if current_status in ["PAID", "VOIDED"]:
+            return {
+                "status": "info",
+                "message": f"Invoice cannot be cancelled as it is already {current_status}"
+            }
+        
+        # Void the invoice
+        invoice_data = {
+            "InvoiceID": xero_invoice_id,
+            "Status": "VOIDED"
+        }
+        
+        data = {"Invoices": [invoice_data]}
+        response = client.make_request("POST", "/Invoices", data=data)
+        
+        if response and "Invoices" in response:
+            voided_invoice = response["Invoices"][0]
+            return {
+                "status": "success",
+                "message": f"Invoice {xero_invoice_id} cancelled successfully in Xero",
+                "data": voided_invoice
+            }
+        
+        return {
+            "status": "error",
+            "message": "Failed to cancel invoice in Xero"
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Failed to cancel invoice {xero_invoice_id} in Xero: {str(e)}", "Xero Cancel Invoice")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @frappe.whitelist()
 def get_customer_contact_id(customer):
-    # Method 1: Using frappe.db.sql for more control
+    """Get customer contact ID from Xero"""
     try:
         dynamic_links = frappe.get_all('Dynamic Link',
             filters={

@@ -50,14 +50,13 @@ doctype_js = {
     "Payment Entry": "xero_erpnext_integration/custom_scripts/payment_entry.js"
 }
 
-override_whitelisted_methods = {
-    "/api/method/xero_webhook": "xero_erpnext_integration.xero_erpnext_integration.apis.webhook.handle_webhook"
-}
-
 scheduler_events = {
     "cron": {
 		"0 */2 * * *":  [
 			"xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.sync_invoice_payments"
+		],
+		"*/30 * * * *": [
+			"xero_erpnext_integration.xero_erpnext_integration.schedulers.voided_invoice_sync.sync_voided_invoices"
 		]
 	},
 }
@@ -66,6 +65,8 @@ scheduler_events = {
 doc_events = {
     "Sales Invoice": {
         "on_submit": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit",
+        "on_cancel": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_cancel",
+        "before_submit": "xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.before_submit",
     }
 }
 
