@@ -146,10 +146,38 @@ def update_invoice_from_xero(invoice_id):
 def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
 	"""Handle when an invoice is marked as PAID in Xero"""
 	try:
-		from .sales_invoice import sync_invoice_payments
+		# Get the Sales Invoice document
+		sales_invoice_doc = frappe.get_doc("Sales Invoice", sales_invoice["name"])
 		
-		# Sync invoice payments from Xero
-		sync_invoice_payments()
+		# Update custom xero invoice number
+		xero_invoice_id = xero_invoice.get("InvoiceID")
+		if xero_invoice_id:
+			sales_invoice_doc.custom_xero_invoice_number = xero_invoice_id
+			sales_invoice_doc.save()
+		
+		# Create payment entry
+		payment_entry = frappe.new_doc("Payment Entry")
+		payment_entry.payment_type = "Receive"
+		payment_entry.party_type = "Customer"
+		payment_entry.party = sales_invoice_doc.customer
+		payment_entry.paid_amount = amount_paid
+		payment_entry.received_amount = amount_paid
+		payment_entry.paid_from = frappe.get_value("Company", sales_invoice_doc.company, "default_receivable_account")
+		payment_entry.paid_to = frappe.get_value("Company", sales_invoice_doc.company, "default_cash_account")
+		payment_entry.reference_no = f"Xero-{xero_invoice_id}"
+		payment_entry.reference_date = frappe.utils.today()
+		
+		# Add reference to sales invoice
+		payment_entry.append("references", {
+			"reference_doctype": "Sales Invoice",
+			"reference_name": sales_invoice_doc.name,
+			"allocated_amount": amount_paid
+		})
+		
+		payment_entry.insert()
+		payment_entry.submit()
+		
+		frappe.log_error(f"Payment entry {payment_entry.name} created for invoice {sales_invoice['name']}", "Xero Webhook Success")
 		
 	except Exception as e:
 		frappe.log_error(f"Error handling paid invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
