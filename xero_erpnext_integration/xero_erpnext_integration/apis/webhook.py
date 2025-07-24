@@ -144,74 +144,23 @@ def update_invoice_from_xero(invoice_id):
         frappe.log_error(f"Error updating invoice {invoice_id} from Xero: {str(e)}", "Xero Webhook")
 
 def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
-    """Handle when an invoice is marked as PAID in Xero"""
-    try:
-        from .sales_invoice import create_payment_entry_from_xero, sync_invoice_payments
-        
-        # Check if invoice is submitted in ERPNext
-        if sales_invoice["docstatus"] != 1:
-            frappe.log_error(f"Invoice {sales_invoice['name']} is not submitted in ERPNext", "Xero Webhook")
-            return
-        
-        # Check if payment already exists
-        existing_payments = frappe.get_all("Payment Entry", 
-            filters={
-                "reference_doctype": "Sales Invoice",
-                "reference_name": sales_invoice["name"],
-                "docstatus": 1
-            },
-            fields=["name", "paid_amount"]
-        )
-        
-        total_existing_payments = sum([float(pe["paid_amount"]) for pe in existing_payments])
-        remaining_amount = amount_paid - total_existing_payments
-        
-        if remaining_amount <= 0:
-            frappe.log_error(f"Payment already exists for invoice {sales_invoice['name']}", "Xero Webhook")
-            return
-        
-        # Create payment entry using existing API
-        # Convert sales_invoice dict to object-like structure for API compatibility
-        from types import SimpleNamespace
-        erpnext_invoice = SimpleNamespace(**sales_invoice)
-        frappe.log_error("Xero Webhook", f"Invoice Object: {erpnext_invoice.name} {xero_invoice} {amount_paid}")
-        
-        # payment_result = create_payment_entry_from_xero(
-        #     erpnext_invoice,
-        #     xero_invoice,
-        #     amount_paid
-        # )
-        payment_result = sync_invoice_payments()
-        
-        if payment_result and payment_result.get("status") == "success":
-            frappe.log_error(f"Payment entry created for invoice {sales_invoice['name']}: {payment_result.get('payment_entry')}", "Xero Webhook Success")
-        else:
-            frappe.log_error(f"Failed to create payment entry for invoice {sales_invoice['name']}: {payment_result.get('message')}", "Xero Webhook")
-            
-    except Exception as e:
-        frappe.log_error(f"Error handling paid invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
+	"""Handle when an invoice is marked as PAID in Xero"""
+	try:
+		from .sales_invoice import sync_invoice_payments
+		
+		# Sync invoice payments from Xero
+		sync_invoice_payments()
+		
+	except Exception as e:
+		frappe.log_error(f"Error handling paid invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
 
 def handle_voided_invoice(sales_invoice, xero_invoice_id):
-    """Handle when an invoice is VOIDED in Xero"""
-    try:
-        # Check if invoice is submitted in ERPNext
-        if sales_invoice["docstatus"] != 1:
-            frappe.log_error(f"Invoice {sales_invoice['name']} is not submitted in ERPNext, cannot cancel", "Xero Webhook")
-            return
-        
-        # Get the Sales Invoice document
-        sales_invoice_doc = frappe.get_doc("Sales Invoice", sales_invoice["name"])
-        
-        # Cancel the invoice in ERPNext
-        sales_invoice_doc.cancel()
-        
-        # Add a comment about the cancellation
-        sales_invoice_doc.add_comment(
-            "Comment",
-            f"Invoice cancelled automatically due to VOID status in Xero (Invoice ID: {xero_invoice_id})"
-        )
-        
-        frappe.log_error(f"Invoice {sales_invoice['name']} cancelled due to VOID in Xero", "Xero Webhook Success")
-        
-    except Exception as e:
-        frappe.log_error(f"Error handling voided invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
+	"""Handle when an invoice is VOIDED in Xero"""
+	try:
+		from ..schedulers.voided_invoice_sync import sync_voided_invoices
+		
+		# Sync voided invoices from Xero
+		sync_voided_invoices()
+		
+	except Exception as e:
+		frappe.log_error(f"Error handling voided invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
