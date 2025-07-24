@@ -156,31 +156,44 @@ def handle_paid_invoice(sales_invoice, xero_invoice, amount_paid):
 			sales_invoice_doc.save()
 		
 		# Create payment entry
-		payment_entry = frappe.new_doc("Payment Entry")
-		payment_entry.payment_type = "Receive"
-		payment_entry.party_type = "Customer"
-		payment_entry.party = sales_invoice_doc.customer
-		payment_entry.paid_amount = amount_paid
-		payment_entry.received_amount = amount_paid
-		payment_entry.paid_from = frappe.get_value("Company", sales_invoice_doc.company, "default_receivable_account")
-		payment_entry.paid_to = frappe.get_value("Company", sales_invoice_doc.company, "default_cash_account")
-		payment_entry.reference_no = f"Xero-{xero_invoice_id}"
-		payment_entry.reference_date = frappe.utils.today()
+		frappe.log_error(f"Starting to create payment entry for invoice: {sales_invoice['name']}", "Xero Webhook")
 		
-		# Add reference to sales invoice
-		payment_entry.append("references", {
-			"reference_doctype": "Sales Invoice",
-			"reference_name": sales_invoice_doc.name,
-			"allocated_amount": amount_paid
-		})
-		
-		payment_entry.insert()
-		payment_entry.submit()
-		
-		frappe.log_error(f"Payment entry {payment_entry.name} created for invoice {sales_invoice['name']}", "Xero Webhook Success")
+		try:
+			payment_entry = frappe.new_doc("Payment Entry")
+			payment_entry.payment_type = "Receive"
+			payment_entry.party_type = "Customer"
+			payment_entry.party = sales_invoice_doc.customer
+			payment_entry.paid_amount = amount_paid
+			payment_entry.received_amount = amount_paid
+			payment_entry.paid_from = frappe.get_value("Company", sales_invoice_doc.company, "default_receivable_account")
+			payment_entry.paid_to = frappe.get_value("Company", sales_invoice_doc.company, "default_cash_account")
+			payment_entry.reference_no = f"Xero-{xero_invoice_id}"
+			payment_entry.reference_date = frappe.utils.today()
+			
+			frappe.log_error(f"Created payment entry with amount {amount_paid} for customer {sales_invoice_doc.customer}", "Xero Webhook")
+			
+			# Add reference to sales invoice
+			payment_entry.append("references", {
+				"reference_doctype": "Sales Invoice",
+				"reference_name": sales_invoice_doc.name,
+				"allocated_amount": amount_paid
+			})
+			
+			frappe.log_error("Xero Webhook", f"Added reference to sales invoice {sales_invoice_doc.name}")
+			
+			payment_entry.insert()
+			frappe.log_error("Xero Webhook", f"Inserted payment entry {payment_entry.name}")
+			
+			payment_entry.submit()
+			frappe.log_error("Xero Webhook", f"Submitted payment entry {payment_entry.name}")
+			
+			frappe.log_error("Xero Webhook Success", f"Successfully created payment entry {payment_entry.name} for invoice {sales_invoice['name']}")
+			
+		except Exception as payment_error:
+			frappe.log_error("Xero Webhook Payment Error", f"Failed to create payment entry for invoice {sales_invoice['name']}: {str(payment_error)}")
 		
 	except Exception as e:
-		frappe.log_error(f"Error handling paid invoice {sales_invoice['name']}: {str(e)}", "Xero Webhook")
+		frappe.log_error("Xero Webhook Error", f"Error handling paid invoice {sales_invoice['name']}: {str(e)}")
 
 def handle_voided_invoice(sales_invoice, xero_invoice_id):
 	"""Handle when an invoice is VOIDED in Xero"""
