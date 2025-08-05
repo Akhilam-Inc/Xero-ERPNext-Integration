@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xero Integration App - User Documentation</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/xero_erpnext_integration/images/akhilam-logo.svg">
+    <link rel="icon" type="image/png" href="/assets/xero_erpnext_integration/images/akhilam-logo.svg">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -30,33 +32,94 @@
             min-height: 100vh;
         }
 
-        /* Header */
+        /* Header with Akhilam branding */
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%);
             color: white;
             padding: 2rem 0;
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(30, 58, 138, 0.3);
+            position: relative;
+            overflow: hidden;
         }
 
-        .header h1 {
-            font-size: 2.5rem;
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            width: 150px;
+            height: 150px;
+            filter: brightness(0) invert(1);
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
+        .header h3 {
+            font-size: 2rem;
             margin-bottom: 0.5rem;
             font-weight: 700;
+            color: #ffffff;
         }
 
         .header p {
             font-size: 1.2rem;
             opacity: 0.9;
-            text-align: center;
+            color: #e2e8f0;
         }
 
-        /* Sidebar Navigation */
+        .powered-by {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: 0.5rem;
+            color: #cbd5e1;
+        }
+
+        .powered-by a {
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .powered-by a:hover {
+            color: #ffffff;
+            text-decoration: underline;
+            opacity: 1;
+        }
+
+        /* Sidebar Navigation with Akhilam colors */
         .sidebar {
             width: 280px;
             background: white;
             padding: 2rem 0;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            box-shadow: 2px 0 10px rgba(30, 58, 138, 0.1);
             position: sticky;
             top: 0;
             height: 100vh;
@@ -74,7 +137,7 @@
         .nav-menu a {
             display: block;
             padding: 0.75rem 2rem;
-            color: #555;
+            color: #475569;
             text-decoration: none;
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
@@ -82,9 +145,9 @@
 
         .nav-menu a:hover,
         .nav-menu a.active {
-            background-color: #f8f9fa;
-            color: #667eea;
-            border-left-color: #667eea;
+            background-color: #f1f5f9;
+            color: #1e40af;
+            border-left-color: #3b82f6;
         }
 
         .nav-menu a i {
@@ -99,7 +162,7 @@
             background: white;
             margin: 2rem;
             border-radius: 10px;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 20px rgba(30, 58, 138, 0.1);
         }
 
         .section {
@@ -117,21 +180,21 @@
         }
 
         h2 {
-            color: #2c3e50;
+            color: #1e293b;
             font-size: 2rem;
             margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
-            border-bottom: 3px solid #667eea;
+            border-bottom: 3px solid #3b82f6;
         }
 
         h3 {
-            color: #34495e;
+            color: #334155;
             font-size: 1.5rem;
             margin: 2rem 0 1rem 0;
         }
 
         h4 {
-            color: #555;
+            color: #475569;
             font-size: 1.2rem;
             margin: 1.5rem 0 0.75rem 0;
         }
@@ -141,14 +204,14 @@
             text-align: justify;
         }
 
-        /* Cards */
+        /* Cards with Akhilam styling */
         .card {
             background: white;
             border-radius: 8px;
             padding: 1.5rem;
             margin: 1rem 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(30, 58, 138, 0.1);
+            border-left: 4px solid #3b82f6;
         }
 
         .card-grid {
@@ -159,24 +222,27 @@
         }
 
         .feature-card {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #1e3a8a 100%);
             color: white;
             text-align: center;
             padding: 2rem;
             border-radius: 10px;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 15px rgba(30, 58, 138, 0.2);
         }
 
         .feature-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(30, 58, 138, 0.3);
         }
 
         .feature-card i {
             font-size: 3rem;
             margin-bottom: 1rem;
+            color: #ffffff;
         }
 
-        /* Tables */
+        /* Tables with Akhilam colors */
         .table-container {
             overflow-x: auto;
             margin: 1.5rem 0;
@@ -188,30 +254,30 @@
             background: white;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(30, 58, 138, 0.1);
         }
 
         th, td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         th {
-            background: #667eea;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
             color: white;
             font-weight: 600;
         }
 
         tr:hover {
-            background-color: #f8f9fa;
+            background-color: #f8fafc;
         }
 
-        /* Buttons */
+        /* Buttons with Akhilam branding */
         .btn {
             display: inline-block;
             padding: 0.75rem 1.5rem;
-            background: #667eea;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
             color: white;
             text-decoration: none;
             border-radius: 5px;
@@ -219,47 +285,51 @@
             border: none;
             cursor: pointer;
             font-size: 1rem;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.2);
         }
 
         .btn:hover {
-            background: #5a6fd8;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
         }
 
         .btn-success {
-            background: #28a745;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
         }
 
         .btn-success:hover {
-            background: #218838;
+            background: linear-gradient(135deg, #047857 0%, #059669 100%);
         }
 
         .btn-warning {
-            background: #ffc107;
-            color: #333;
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+            color: #ffffff;
         }
 
         .btn-warning:hover {
-            background: #e0a800;
+            background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
         }
 
         /* Code blocks */
         pre {
-            background: #2d3748;
+            background: #1e293b;
             color: #e2e8f0;
             padding: 1.5rem;
             border-radius: 8px;
             overflow-x: auto;
             margin: 1rem 0;
             font-family: 'Courier New', monospace;
+            border-left: 4px solid #3b82f6;
         }
 
         code {
-            background: #f1f3f4;
+            background: #f1f5f9;
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Courier New', monospace;
-            color: #d63384;
+            color: #dc2626;
         }
 
         /* Lists */
@@ -272,7 +342,7 @@
             margin-bottom: 0.5rem;
         }
 
-        /* Alerts */
+        /* Alerts with Akhilam colors */
         .alert {
             padding: 1rem 1.5rem;
             border-radius: 8px;
@@ -281,30 +351,30 @@
         }
 
         .alert-info {
-            background: #e3f2fd;
-            border-color: #2196f3;
-            color: #0d47a1;
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #1e40af;
         }
 
         .alert-warning {
-            background: #fff3e0;
-            border-color: #ff9800;
-            color: #e65100;
+            background: #fffbeb;
+            border-color: #f59e0b;
+            color: #92400e;
         }
 
         .alert-success {
-            background: #e8f5e8;
-            border-color: #4caf50;
-            color: #2e7d32;
+            background: #f0fdf4;
+            border-color: #10b981;
+            color: #065f46;
         }
 
         .alert-danger {
-            background: #ffebee;
-            border-color: #f44336;
-            color: #c62828;
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #991b1b;
         }
 
-        /* Steps */
+        /* Steps with Akhilam styling */
         .steps {
             counter-reset: step-counter;
         }
@@ -316,8 +386,8 @@
             margin: 1rem 0;
             background: white;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(30, 58, 138, 0.1);
+            border-left: 4px solid #3b82f6;
         }
 
         .step::before {
@@ -325,7 +395,7 @@
             position: absolute;
             left: -15px;
             top: 1.5rem;
-            background: #667eea;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
             color: white;
             width: 30px;
             height: 30px;
@@ -336,7 +406,7 @@
             font-weight: bold;
         }
 
-        /* Search */
+        /* Search with Akhilam styling */
         .search-container {
             position: relative;
             margin-bottom: 2rem;
@@ -345,7 +415,7 @@
         .search-input {
             width: 100%;
             padding: 1rem;
-            border: 2px solid #e9ecef;
+            border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 1rem;
             transition: border-color 0.3s ease;
@@ -353,7 +423,8 @@
 
         .search-input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
         .search-icon {
@@ -361,7 +432,7 @@
             right: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #6c757d;
+            color: #64748b;
         }
 
         /* Responsive */
@@ -388,6 +459,15 @@
             .card-grid {
                 grid-template-columns: 1fr;
             }
+
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-text {
+                text-align: center;
+            }
         }
 
         /* Print styles */
@@ -410,8 +490,16 @@
 </head>
 <body>
     <div class="header">
-        <h1><i class="fas fa-sync-alt"></i> Xero Erpnext Integration App</h1>
-        <p>Complete User Documentation</p>
+        <div class="header-content">
+            <div class="logo-container">
+                <img src="/assets/xero_erpnext_integration/images/akhilam-logo.svg" alt="Akhilam Inc" class="logo">
+            </div>
+                            <div class="header-text">
+                    <h3><i class="fas fa-sync-alt"></i> Xero ERPNext Integration</h3>
+                    <p>Complete User Documentation</p>
+                    <div class="powered-by">Powered by <a href="https://akhilaminc.com" target="_blank" rel="noopener noreferrer">Akhilam Inc</a></div>
+                </div>
+        </div>
     </div>
 
     <div class="container">
