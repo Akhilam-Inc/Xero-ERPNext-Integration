@@ -24,6 +24,7 @@ def before_submit(doc, method=None):
         "Please click the 'Update Contact' button to map or create the contact in Xero."
     ).format(doc.customer))
 
+@frappe.whitelist()
 def on_submit(doc, method=None, sync_to_xero=None):
     """Create invoice in Xero after submission"""
     # Skip if sync is disabled
