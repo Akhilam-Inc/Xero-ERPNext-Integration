@@ -25,7 +25,7 @@ frappe.ui.form.on('Sales Invoice', {
                     method: 'xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit',
                     args: {
                         doc: frm.doc,
-                        sync_to_xero: true
+                        sync_to_xero: false
                     }
                 });
             });
