@@ -22,10 +22,21 @@ frappe.ui.form.on('Sales Invoice', {
         if(!frm.doc.custom_xero_invoice_number && frm.doc.docstatus == 1){
             frm.add_custom_button(__('Sync Invoice in Xero'), function () {
                 frappe.call({
-                    method: 'xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit',
+                    method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
                     args: {
                         doc: frm.doc,
                         sync_to_xero: false
+                    },
+                    callback: function (r) {    
+                        if (r.message) {
+                            if(r.message.status === 'success'){
+                                frm.set_value('custom_xero_invoice_number', r.message.data.InvoiceID);
+                                frappe.msgprint(__('Invoice created successfully in Xero'));
+                                frm.reload_doc();
+                            }else{
+                                frappe.msgprint(__('Failed to create invoice in Xero'));
+                            }
+                        }
                     }
                 });
             });
