@@ -30,13 +30,13 @@ frappe.ui.form.on('Sales Invoice', {
                     callback: function (r) {    
                         if (r.message) {
                             if(r.message.status === 'success'){
-                                frm.set_value('custom_xero_invoice_number', r.message.data.InvoiceID);
-                                frm.save({
-                                    callback: function () { 
+                                // Use frappe.db.set_value to update only the specific field without triggering save
+                                frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, 
+                                    function() {
                                         frappe.msgprint(__('Invoice created successfully in Xero'));
                                         frm.reload_doc();
                                     }
-                                });
+                                );
                             }else{
                                 frappe.msgprint(__('Failed to create invoice in Xero'));
                             }
@@ -46,13 +46,13 @@ frappe.ui.form.on('Sales Invoice', {
             }, __("Action"));
         } else if(frm.doc.custom_do_not_sync_to_xero && frm.doc.docstatus == 1) {
             frm.add_custom_button(__('Enable Xero Sync'), function () {
-                frm.set_value('custom_do_not_sync_to_xero', 0);
-                frm.save({
-                    callback: function () { 
+                frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_do_not_sync_to_xero', 0, 
+                    function() {
                         frappe.msgprint(__('Xero sync enabled for this invoice. You can now sync to Xero.'));
                         frm.reload_doc();
                     }
-                });
+                );
+                
             }, __("Action"));
             
         }

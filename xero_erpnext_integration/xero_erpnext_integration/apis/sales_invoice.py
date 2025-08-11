@@ -252,6 +252,12 @@ def create_invoice(doc, method=None):
             
             line_items.append(line_item)
         
+        # Validate invoice dates
+        if not invoice.posting_date:
+            frappe.throw(f"Posting date is required for invoice {invoice.name}")
+        if not invoice.due_date:
+            frappe.throw(f"Due date is required for invoice {invoice.name}")
+        
         # Prepare invoice data
         invoice_data = {
             "Type": "ACCREC",
@@ -274,8 +280,12 @@ def create_invoice(doc, method=None):
         data = {"Invoices": [invoice_data]}
         frappe.logger().info(f"Sending invoice data to Xero: {data}")
         
-        response = client.make_request("POST", "/Invoices", data=data)
-        frappe.logger().info(f"Xero API response: {response}")
+        try:
+            response = client.make_request("POST", "/Invoices", data=data)
+            frappe.logger().info(f"Xero API response: {response}")
+        except Exception as api_error:
+            frappe.logger().error(f"Xero API call failed: {str(api_error)}")
+            frappe.throw(f"Failed to communicate with Xero API: {str(api_error)}")
         
         if response and "Invoices" in response:
             xero_invoice = response["Invoices"][0]
