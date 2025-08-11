@@ -24,7 +24,7 @@ frappe.ui.form.on('Sales Invoice', {
                 frappe.call({
                     method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
                     args: {
-                        doc: frm.doc,
+                        doc: frm.doc.name,
                         sync_to_xero: false
                     },
                     callback: function (r) {    
