@@ -228,7 +228,7 @@ def create_invoice(doc, method=None):
         # Get the Sales Invoice document
         if isinstance(doc, str):
             invoice = frappe.get_doc("Sales Invoice", doc)
-        else:
+        elif hasattr(doc, 'doctype') and doc.doctype == 'Sales Invoice':
             invoice = doc
         
         # Get customer contact ID from Xero
@@ -252,6 +252,12 @@ def create_invoice(doc, method=None):
             
             line_items.append(line_item)
         
+        # Validate invoice dates
+        if not invoice.posting_date:
+            frappe.throw(f"Posting date is required for invoice {invoice.name}")
+        if not invoice.due_date:
+            frappe.throw(f"Due date is required for invoice {invoice.name}")
+        
         # Prepare invoice data
         invoice_data = {
             "Type": "ACCREC",
@@ -272,7 +278,14 @@ def create_invoice(doc, method=None):
             invoice_data["CurrencyCode"] = invoice.currency
         
         data = {"Invoices": [invoice_data]}
-        response = client.make_request("POST", "/Invoices", data=data)
+        frappe.logger().info(f"Sending invoice data to Xero: {data}")
+        
+        try:
+            response = client.make_request("POST", "/Invoices", data=data)
+            frappe.logger().info(f"Xero API response: {response}")
+        except Exception as api_error:
+            frappe.logger().error(f"Xero API call failed: {str(api_error)}")
+            frappe.throw(f"Failed to communicate with Xero API: {str(api_error)}")
         
         if response and "Invoices" in response:
             xero_invoice = response["Invoices"][0]
@@ -283,9 +296,22 @@ def create_invoice(doc, method=None):
                 "message": f"Invoice created in Xero with ID: {xero_invoice.get('InvoiceID')}"
             }
         
+        # Check for Xero API errors
+        if response and "Elements" in response:
+            # Xero returns errors in Elements array
+            errors = response.get("Elements", [])
+            if errors and len(errors) > 0:
+                error_msg = errors[0].get("ValidationErrors", [{}])[0].get("Message", "Unknown Xero error")
+                frappe.logger().error(f"Xero API validation error: {error_msg}")
+                return {
+                    "status": "error",
+                    "message": f"Xero validation error: {error_msg}"
+                }
+        
+        frappe.logger().error(f"Unexpected Xero API response format: {response}")
         return {
             "status": "error",
-            "message": "Failed to create invoice in Xero"
+            "message": "Failed to create invoice in Xero - unexpected response format"
         }
         
     except Exception as e:
@@ -470,6 +496,12 @@ def cancel_invoice_in_xero(xero_invoice_id):
 def get_customer_contact_id(customer):
     """Get customer contact ID from Xero"""
     try:
+        # First check if the customer has a direct custom_contact_id field
+        customer_doc = frappe.get_doc('Customer', customer)
+        if customer_doc.get('custom_contact_id'):
+            return customer_doc.get('custom_contact_id')
+        
+        # Then check through dynamic links to Contact
         dynamic_links = frappe.get_all('Dynamic Link',
             filters={
                 'link_doctype': 'Customer',
@@ -487,4 +519,5 @@ def get_customer_contact_id(customer):
         
         return None
     except Exception as e:
-        frappe.throw("Error getting contact id for the selected customer")
+        frappe.log_error(f"Error getting contact id for customer {customer}: {str(e)}", "Get Customer Contact ID")
+        frappe.throw(f"Error getting contact id for the selected customer: {str(e)}")
