@@ -31,8 +31,12 @@ frappe.ui.form.on('Sales Invoice', {
                         if (r.message) {
                             if(r.message.status === 'success'){
                                 frm.set_value('custom_xero_invoice_number', r.message.data.InvoiceID);
-                                frappe.msgprint(__('Invoice created successfully in Xero'));
-                                frm.reload_doc();
+                                frm.save({
+                                    callback: function () { 
+                                        frappe.msgprint(__('Invoice created successfully in Xero'));
+                                        frm.reload_doc();
+                                    }
+                                });
                             }else{
                                 frappe.msgprint(__('Failed to create invoice in Xero'));
                             }
