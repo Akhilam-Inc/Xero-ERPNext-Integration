@@ -57,6 +57,15 @@ frappe.ui.form.on('Sales Invoice', {
             
         }
     },
+    sync_to_xero(frm){
+        console.log(frm.doc.status);
+        // frappe.call({
+        //     method: 'xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit',
+        //     args: {
+        //         doc: frm.doc.name
+        //     }
+        // });
+    },
 
     customer(frm) {
         // Also trigger when customer is changed
