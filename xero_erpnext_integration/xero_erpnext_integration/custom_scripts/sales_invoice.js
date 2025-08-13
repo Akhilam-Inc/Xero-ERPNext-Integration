@@ -57,15 +57,20 @@ frappe.ui.form.on('Sales Invoice', {
             
         }
     },
-    sync_to_xero(frm){
-        console.log(frm.doc.status);
-        // frappe.call({
-        //     method: 'xero_erpnext_integration.xero_erpnext_integration.custom_scripts.sales_invoice.on_submit',
-        //     args: {
-        //         doc: frm.doc.name
-        //     }
-        // });
-    },
+    before_workflow_action: async(frm) => {
+        if (frm.doc.workflow_state === 'Sync to Xero') {
+			let promise = new Promise((resolve, reject) => {
+                console.log(frm.doc.workflow_state);
+			//    sync_to_xero_workflow_action(frm.doc);
+            })
+			frappe.dom.unfreeze();
+			await promise.catch(() => {
+				throw '';
+			});
+			frm.reload_doc();
+		}
+	},
+   
 
     customer(frm) {
         // Also trigger when customer is changed
@@ -238,3 +243,35 @@ function create_contact_in_xero(frm, contact_person) {
         }
     });
 }
+
+// Function to handle workflow action "Sync to Xero"
+function sync_to_xero_workflow_action(doc) {
+    frappe.call({
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
+        args: {
+            doc: doc.name,
+            sync_to_xero: false
+        },
+        callback: function(r) {    
+            if (r.message) {
+                if(r.message.status === 'success'){
+                    // Update the Xero invoice number
+                    frappe.db.set_value('Sales Invoice', doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, 
+                        function() {
+                            frappe.msgprint(__('Invoice synced successfully to Xero'));
+                            // Reload the form to reflect changes
+                            if (cur_frm) {
+                                cur_frm.reload_doc();
+                            }
+                        }
+                    );
+                } else {
+                    frappe.msgprint(__('Failed to sync invoice to Xero'));
+                }
+            }
+        }
+    });
+}
+
+// Make the function globally available for workflow actions
+// window.sync_to_xero_workflow_action = sync_to_xero_workflow_action;
