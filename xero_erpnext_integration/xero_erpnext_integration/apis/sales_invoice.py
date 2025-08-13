@@ -11,7 +11,8 @@ def sync_invoice_payments():
         unpaid_invoices = frappe.get_all("Sales Invoice", 
             filters={
                 "custom_xero_invoice_number": ["is", "set"],
-                "status": ["in", ["Unpaid", "Overdue"]]
+                "status": ["in", ["Draft","Unpaid", "Overdue"]],
+                "workflow_state": ["in", ["Synced to Xero", "Submitted"]]
             },
             fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number", "company"]
         )
@@ -205,6 +206,17 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         # Save and submit
         payment_entry.insert()
         payment_entry.submit()
+        
+        # Change workflow state to Submitted if workflow exists
+        try:
+            if hasattr(sales_invoice, 'workflow_state') and sales_invoice.workflow_state == "Synced to Xero":
+                sales_invoice.workflow_state = "Submitted"
+                sales_invoice.save()
+                sales_invoice.submit()
+                frappe.db.commit()
+        except Exception as workflow_error:
+            # Log workflow state change error but don't fail the payment entry creation
+            frappe.log_error("Workflow State Change", f"Error changing workflow state for {sales_invoice.name}: {str(workflow_error)}")
         
         return {
             "status": "success", 

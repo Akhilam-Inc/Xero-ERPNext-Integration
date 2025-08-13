@@ -58,20 +58,11 @@ frappe.ui.form.on('Sales Invoice', {
         }
     },
     before_workflow_action: async(frm) => {
-        if (frm.doc.workflow_state === 'Sync to Xero') {
-			let promise = new Promise((resolve, reject) => {
-                console.log(frm.doc.workflow_state);
-			//    sync_to_xero_workflow_action(frm.doc);
-            })
-			frappe.dom.unfreeze();
-			await promise.catch(() => {
-				throw '';
-			});
+        if (frm.doc.workflow_state === 'Draft') {
+            sync_to_xero_workflow_action(frm.doc, false);
 			frm.reload_doc();
 		}
 	},
-   
-
     customer(frm) {
         // Also trigger when customer is changed
         if (frm.doc.customer) {
@@ -111,6 +102,11 @@ frappe.ui.form.on('Sales Invoice', {
         } else {
             // Clear the field if no customer selected
             frm.set_value('custom_contact_id', '');
+        }
+
+        if(frm.doc.workflow_state === 'Synced to Xero' && frm.doc.custom_xero_invoice_number){
+            sync_to_xero_workflow_action(frm.doc, true);
+            frm.reload_doc();
         }
     }
 });
@@ -245,12 +241,12 @@ function create_contact_in_xero(frm, contact_person) {
 }
 
 // Function to handle workflow action "Sync to Xero"
-function sync_to_xero_workflow_action(doc) {
+function sync_to_xero_workflow_action(doc, update=false) {
     frappe.call({
         method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
         args: {
             doc: doc.name,
-            sync_to_xero: false
+            update: update
         },
         callback: function(r) {    
             if (r.message) {
