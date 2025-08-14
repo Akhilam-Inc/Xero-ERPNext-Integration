@@ -90,7 +90,17 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         
         # Get the Sales Invoice document
         sales_invoice = frappe.get_doc("Sales Invoice", erpnext_invoice.name)
-        
+        try:
+            if hasattr(sales_invoice, 'workflow_state') and sales_invoice.workflow_state == "Synced to Xero":
+                sales_invoice.workflow_state = "Submitted"
+                sales_invoice.save()
+                sales_invoice.submit()
+                frappe.db.commit()
+        except Exception as workflow_error:
+            # Log workflow state change error but don't fail the payment entry creation
+            frappe.log_error("Workflow State Change", f"Error changing workflow state for {sales_invoice.name}: {str(workflow_error)}")
+
+
         # Check if payment entry already exists
         existing_payments = frappe.get_all("Payment Entry", 
             filters={
@@ -207,16 +217,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         payment_entry.insert()
         payment_entry.submit()
          # Change workflow state to Submitted if workflow exists
-        try:
-            if hasattr(sales_invoice, 'workflow_state') and sales_invoice.workflow_state == "Synced to Xero":
-                sales_invoice.workflow_state = "Submitted"
-                sales_invoice.save()
-                sales_invoice.submit()
-                frappe.db.commit()
-        except Exception as workflow_error:
-            # Log workflow state change error but don't fail the payment entry creation
-            frappe.log_error("Workflow State Change", f"Error changing workflow state for {sales_invoice.name}: {str(workflow_error)}")
-
+        
         
         return {
             "status": "success", 
@@ -233,7 +234,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
 
         
 @frappe.whitelist() 
-def create_invoice(doc, method=None, update=False):
+def create_invoice(doc, method=None, update_invoice=False):
     """Create invoice in Xero"""
     try:
         client = get_xero_client()
@@ -291,7 +292,7 @@ def create_invoice(doc, method=None, update=False):
         
         data = {"Invoices": [invoice_data]}
         try:
-            if update:
+            if invoice.custom_xero_invoice_number and invoice.workflow_state == "Synced to Xero" and update_invoice:
                 response = client.make_request("POST", f"/Invoices/{invoice.custom_xero_invoice_number}", data=data)
             else:
                 response = client.make_request("POST", "/Invoices", data=data)
