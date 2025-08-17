@@ -1,122 +1,163 @@
 frappe.ui.form.on('Sales Invoice', {
     refresh(frm) {
-        if (!frm.doc.custom_contact_id && frm.doc.customer && frm.doc.contact_person) {
-            frm.add_custom_button(__('Sync Contact in Xero'), function () {
-                if (frm.doc.customer && frm.doc.contact_person) {
-                    frappe.call({
-                        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.fetch_xero_contacts',
-                        args: {
-                            contact_person: frm.doc.contact_person
-                        },
-                        callback: function (r) {
-                            if (r.message && r.message.length > 0) {
-                                show_contact_mapping_dialog(frm, r.message, frm.doc.contact_person);
-                            } else {
-                                show_create_contact_dialog(frm, frm.doc.contact_person);
-                            }
-                        }
-                    });
-                }
-            });
-        }
-        if(!frm.doc.custom_xero_invoice_number && frm.doc.docstatus == 1 && !frm.doc.custom_do_not_sync_to_xero){
-            frm.add_custom_button(__('Sync Invoice in Xero'), function () {
-                frappe.call({
-                    method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
-                    args: {
-                        doc: frm.doc.name,
-                        sync_to_xero: false
-                    },
-                    callback: function (r) {    
-                        if (r.message) {
-                            if(r.message.status === 'success'){
-                                // Use frappe.db.set_value to update only the specific field without triggering save
-                                frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, 
-                                    function() {
-                                        frappe.msgprint(__('Invoice created successfully in Xero'));
-                                        frm.reload_doc();
-                                    }
-                                );
-                            }else{
-                                frappe.msgprint(__('Failed to create invoice in Xero'));
-                            }
-                        }
-                    }
-                });
-            }, __("Action"));
-        } else if(frm.doc.custom_do_not_sync_to_xero && frm.doc.docstatus == 1) {
-            frm.add_custom_button(__('Enable Xero Sync'), function () {
-                frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_do_not_sync_to_xero', 0, 
-                    function() {
-                        frappe.msgprint(__('Xero sync enabled for this invoice. You can now sync to Xero.'));
-                        frm.reload_doc();
-                    }
-                );
-                
-            }, __("Action"));
-            
+        add_xero_buttons(frm);
+        set_status_indicator(frm);
+        if(frm.doc.status != 'Draft'){
+            frm.set_df_property('custom_do_not_sync_to_xero', 'read_only', 1);
         }
     },
-    // before_workflow_action: async(frm) => {
-    //     if (frm.doc.workflow_state === 'Draft') {
-    //         sync_to_xero_workflow_action(frm.doc, false);
-	// 		frm.reload_doc();
-	// 	}else if(frm.doc.workflow_state === 'Synced to Xero' && frm.doc.custom_xero_invoice_number){
-	// 		sync_to_xero_workflow_action(frm.doc, true);
-	// 		frm.reload_doc();
-	// 	}
-	// },
-    customer(frm) {
-        // Also trigger when customer is changed
-        if (frm.doc.customer) {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
-                args: {
-                    customer: frm.doc.customer
-                },
-                callback: function (r) {
-                    if (r.message) {
-                        let contact = r.message;
-                        // Set the custom_contact_id field in Sales Invoice
-                        frm.set_value('custom_contact_id', r.message);
-                    }
-                }
-            });
-        } else {
-            // Clear the field if no customer selected
-            frm.set_value('custom_contact_id', '');
-        }
-    },
-    after_save(frm){
-        if (frm.doc.customer) {
-            frappe.call({
-                method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
-                args: {
-                    customer: frm.doc.customer
-                },
-                callback: function (r) {
-                    if (r.message) {
-                        let contact = r.message;
-                        // Set the custom_contact_id field in Sales Invoice
-                        frm.set_value('custom_contact_id', r.message);
-                    }
-                }
-            });
-        } else {
-            // Clear the field if no customer selected
-            frm.set_value('custom_contact_id', '');
-        }
+   
 
-        if(frm.doc.workflow_state === 'Synced to Xero' && frm.doc.custom_xero_invoice_number){
+    before_workflow_action: async(frm) => {
+        if (frm.doc.workflow_state === 'Draft' && frm.doc.custom_contact_id) {
+            sync_to_xero_workflow_action(frm.doc, false);
+            frm.reload_doc();
+        }
+        else if (frm.doc.workflow_state === 'Synced to Xero' && frm.doc.custom_xero_invoice_number) {
             sync_to_xero_workflow_action(frm.doc, true);
             frm.reload_doc();
         }
-        if (frm.doc.workflow_state === 'Draft') {
-            sync_to_xero_workflow_action(frm.doc, false);
-			frm.reload_doc();
-		}
+    },
+
+    after_workflow_action: async(frm) => {
+        if (!frm.doc.custom_contact_id && frm.doc.workflow_state === 'Draft' && !frm.doc.custom_do_not_sync_to_xero) {
+            frappe.msgprint(__('Please map the contact to Xero first'));
+        }
+    },
+
+    customer(frm) {
+        update_customer_contact_id(frm);
+    },
+
+    after_save(frm) {
+        if (frm.doc.customer && frm.doc.custom_do_not_sync_to_xero == 0) {
+            update_customer_contact_id(frm, true);
+        }
+
+        if (frm.doc.workflow_state === 'Synced to Xero' && frm.doc.custom_xero_invoice_number) {
+            sync_to_xero_workflow_action(frm.doc, true);
+            frm.reload_doc();
+        }
     }
 });
+
+// ---------------- Helper Functions ----------------
+
+function add_xero_buttons(frm) {
+    const canSyncContact = !frm.is_new() && frm.doc.customer && frm.doc.contact_person && !frm.doc.custom_do_not_sync_to_xero && !frm.doc.custom_contact_id;
+    const canSyncInvoice = !frm.doc.custom_xero_invoice_number && frm.doc.docstatus === 1 && !frm.doc.custom_do_not_sync_to_xero;
+    const canEnableSync = frm.doc.custom_do_not_sync_to_xero && frm.doc.docstatus === 1;
+
+    if (canSyncContact) {
+        frm.add_custom_button(__('Sync Contact in Xero'), () => fetch_xero_contacts(frm));
+    }
+
+    if (canSyncInvoice) {
+        frm.add_custom_button(__('Sync Invoice in Xero'), () => create_invoice_in_xero(frm), __("Action"));
+    }
+    else if (canEnableSync) {
+        frm.add_custom_button(__('Enable Xero Sync'), () => toggle_xero_sync(frm, false), __("Action"));
+    }
+}
+
+function add_status_button(frm, label, color) {
+    frm.add_custom_button(__(label), function () {})
+        .css('background-color', color)
+        .css('color', 'white');
+}
+
+function fetch_xero_contacts(frm) {
+    frappe.call({
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.fetch_xero_contacts',
+        args: { contact_person: frm.doc.contact_person },
+        callback(r) {
+            if (r.message && r.message.length > 0) {
+                show_contact_mapping_dialog(frm, r.message, frm.doc.contact_person);
+            } else {
+                show_create_contact_dialog(frm, frm.doc.contact_person);
+            }
+        }
+    });
+}
+
+function create_invoice_in_xero(frm) {
+    if(frm.doc.custom_contact_id){
+        frappe.call({
+            method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
+            args: { doc: frm.doc.name, sync_to_xero: false },
+            callback(r) {
+                if (r.message) {
+                    if (r.message.status === 'success') {
+                        frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, () => {
+                            frappe.msgprint(__('Invoice created successfully in Xero'));
+                            frm.reload_doc();
+                        });
+                    } else {
+                        frappe.msgprint(__('Failed to create invoice in Xero'));
+                    }
+                }
+            }
+        });
+    }else{
+        frappe.msgprint(__('Please map the contact to Xero first'));
+    }
+}
+
+function set_status_indicator(frm){
+    const statusConfig = {
+        'Draft': {
+            color: 'red',
+            label: __(`${frm.doc.status} - Draft`)
+        },
+        'Submitted': {
+            color: 'blue',
+            label: __(`${frm.doc.status} - Submitted`)
+        },
+        'Synced to Xero': {
+            color: 'green',
+            label: __(`${frm.doc.status} - Synced to Xero`)
+        }
+    };
+    if(frm.doc.workflow_state){
+        frm.page.set_indicator(
+            statusConfig[frm.doc.workflow_state].label,
+            statusConfig[frm.doc.workflow_state].color,
+        );
+    }
+}
+
+function toggle_xero_sync(frm, disable) {
+    frappe.db.set_value('Sales Invoice', frm.doc.name, 'custom_do_not_sync_to_xero', disable ? 1 : 0, () => {
+        frappe.msgprint(
+            disable
+                ? __('Xero sync disabled for this invoice.')
+                : __('Xero sync enabled for this invoice. You can now sync to Xero.')
+        );
+        frm.reload_doc();
+    });
+}
+
+function update_customer_contact_id(frm, autoSave = false) {
+    if (frm.doc.customer) {
+        frappe.call({
+            method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.get_customer_contact_id',
+            args: { customer: frm.doc.customer },
+            callback(r) {
+                if (r.message) {
+                    frm.set_value('custom_contact_id', r.message);
+                    if (autoSave) frm.save();
+                } else {
+                    frm.set_value('custom_contact_id', '');
+                    frm.set_value('workflow_state', 'Draft');
+                    if (autoSave) frm.save();
+                }
+            }
+        });
+    } else {
+        frm.set_value('custom_contact_id', '');
+    }
+}
+
 
 function show_contact_mapping_dialog(frm, xero_contacts, contact_person) {
     let d = new frappe.ui.Dialog({
@@ -247,37 +288,29 @@ function create_contact_in_xero(frm, contact_person) {
     });
 }
 
-// Function to handle workflow action "Sync to Xero"
-function sync_to_xero_workflow_action(doc, update_invoice=false) {
-    frappe.call({
-        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice',
-        args: {
-            doc: doc.name,
-            update: update_invoice
-        },
-        callback: function(r) {    
-            if (r.message) {
-                if(r.message.status === 'success' && !doc.custom_xero_invoice_number){
-                    // Update the Xero invoice number
-                    frappe.db.set_value('Sales Invoice', doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, 
-                        function() {
-                            frappe.msgprint(__('Invoice synced successfully to Xero'));
-                            // Reload the form to reflect changes
-                            if (cur_frm) {
-                                cur_frm.reload_doc();
-                            }
-                        }
-                    );
-                } else if(r.message.status === 'success' && doc.custom_xero_invoice_number){
-                    frappe.msgprint(__('Invoice Updated successfully in Xero'));
-                }
-                else {
-                    frappe.msgprint(__('Failed to sync invoice to Xero'));
-                }
-            }
-        }
-    });
+function sync_to_xero_workflow_action(doc, update_invoice=false) { 
+    frappe.call({ 
+        method: 'xero_erpnext_integration.xero_erpnext_integration.apis.sales_invoice.create_invoice', 
+        args: { 
+            doc: doc.name, 
+            update: update_invoice 
+        }, 
+        callback: function(r) { 
+            if (r.message) { 
+                if(r.message.status === 'success' && !doc.custom_xero_invoice_number){ 
+                    // Update the Xero invoice number 
+                    frappe.db.set_value('Sales Invoice', doc.name, 'custom_xero_invoice_number', r.message.data.InvoiceID, function() { 
+                        frappe.msgprint(__('Invoice synced successfully to Xero')); // Reload the form to reflect changes 
+                        if (cur_frm) { 
+                            cur_frm.reload_doc(); 
+                        } 
+                    } ); 
+                } else if(r.message.status === 'success' && doc.custom_xero_invoice_number){ 
+                    frappe.msgprint(__('Invoice Updated successfully in Xero')); 
+                } else { 
+                    frappe.msgprint(__('Failed to sync invoice to Xero')); 
+                } 
+            } 
+        } 
+    }); 
 }
-
-// Make the function globally available for workflow actions
-// window.sync_to_xero_workflow_action = sync_to_xero_workflow_action;

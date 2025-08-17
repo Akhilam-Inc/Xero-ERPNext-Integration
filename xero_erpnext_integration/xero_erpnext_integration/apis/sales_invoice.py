@@ -2,6 +2,7 @@ import frappe
 from .base import get_xero_client
 from datetime import datetime
 from frappe.utils import flt
+import time
 
 @frappe.whitelist()
 def sync_invoice_payments():
@@ -11,7 +12,7 @@ def sync_invoice_payments():
         unpaid_invoices = frappe.get_all("Sales Invoice", 
             filters={
                 "custom_xero_invoice_number": ["is", "set"],
-                "status": ["in", ["Draft","Unpaid", "Overdue"]],
+                "status": ["in", ["Draft","Unpaid", "Overdue", "Partly Paid"]],
                 "workflow_state": ["in", ["Synced to Xero", "Submitted"]]
             },
             fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number", "company"]
@@ -32,6 +33,7 @@ def sync_invoice_payments():
         response = client.make_request("GET", f"/invoices?IDs={invoice_ids_str}")
         
         xero_invoices = response.get("Invoices", [])
+
         processed_invoices = []
         
         for xero_invoice in xero_invoices:
@@ -144,7 +146,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         payment_entry.posting_date = payment_date
         payment_entry.paid_amount = remaining_amount
         payment_entry.received_amount = remaining_amount
-        payment_entry.reference_no = latest_payment.get("Reference", f"Xero-{invoice_id[:8]}")
+        payment_entry.reference_no = latest_payment.get("PaymentID", f"Xero-{invoice_id[:8]}")
         payment_entry.reference_date = payment_date
         payment_entry.remarks = f"Payment synced from Xero for Invoice {sales_invoice.name}"
         
