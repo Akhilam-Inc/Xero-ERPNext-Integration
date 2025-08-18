@@ -9,7 +9,7 @@ frappe.ui.form.on('Sales Invoice', {
    
 
     before_workflow_action: async(frm) => {
-        if (frm.doc.workflow_state === 'Draft' && frm.doc.custom_contact_id) {
+        if (frm.doc.workflow_state === 'Draft' && frm.doc.custom_contact_id && !frm.doc.custom_do_not_sync_to_xero) {
             sync_to_xero_workflow_action(frm.doc, false);
             frm.reload_doc();
         }
