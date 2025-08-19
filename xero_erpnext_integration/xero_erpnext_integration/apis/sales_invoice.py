@@ -2,6 +2,7 @@ import frappe
 from .base import get_xero_client
 from datetime import datetime
 from frappe.utils import flt
+import time
 
 @frappe.whitelist()
 def sync_invoice_payments():
@@ -11,7 +12,8 @@ def sync_invoice_payments():
         unpaid_invoices = frappe.get_all("Sales Invoice", 
             filters={
                 "custom_xero_invoice_number": ["is", "set"],
-                "status": ["in", ["Unpaid", "Overdue"]]
+                "status": ["in", ["Draft","Unpaid", "Overdue", "Partly Paid"]],
+                "workflow_state": ["in", ["Synced to Xero", "Submitted"]]
             },
             fields=["name", "customer", "grand_total", "outstanding_amount", "custom_xero_invoice_number", "company"]
         )
@@ -31,6 +33,7 @@ def sync_invoice_payments():
         response = client.make_request("GET", f"/invoices?IDs={invoice_ids_str}")
         
         xero_invoices = response.get("Invoices", [])
+
         processed_invoices = []
         
         for xero_invoice in xero_invoices:
@@ -89,7 +92,17 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         
         # Get the Sales Invoice document
         sales_invoice = frappe.get_doc("Sales Invoice", erpnext_invoice.name)
-        
+        try:
+            if hasattr(sales_invoice, 'workflow_state') and sales_invoice.workflow_state == "Synced to Xero":
+                sales_invoice.workflow_state = "Submitted"
+                sales_invoice.save()
+                sales_invoice.submit()
+                frappe.db.commit()
+        except Exception as workflow_error:
+            # Log workflow state change error but don't fail the payment entry creation
+            frappe.log_error("Workflow State Change", f"Error changing workflow state for {sales_invoice.name}: {str(workflow_error)}")
+
+
         # Check if payment entry already exists
         existing_payments = frappe.get_all("Payment Entry", 
             filters={
@@ -133,7 +146,7 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         payment_entry.posting_date = payment_date
         payment_entry.paid_amount = remaining_amount
         payment_entry.received_amount = remaining_amount
-        payment_entry.reference_no = latest_payment.get("Reference", f"Xero-{invoice_id[:8]}")
+        payment_entry.reference_no = latest_payment.get("PaymentID", f"Xero-{invoice_id[:8]}")
         payment_entry.reference_date = payment_date
         payment_entry.remarks = f"Payment synced from Xero for Invoice {sales_invoice.name}"
         
@@ -205,6 +218,8 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
         # Save and submit
         payment_entry.insert()
         payment_entry.submit()
+         # Change workflow state to Submitted if workflow exists
+        
         
         return {
             "status": "success", 
@@ -219,8 +234,9 @@ def create_payment_entry_from_xero(erpnext_invoice, xero_invoice, amount_paid):
             "message": str(e)
         }
 
+        
 @frappe.whitelist() 
-def create_invoice(doc, method=None):
+def create_invoice(doc, method=None, update_invoice=False):
     """Create invoice in Xero"""
     try:
         client = get_xero_client()
@@ -251,8 +267,7 @@ def create_invoice(doc, method=None):
                 line_item["DiscountRate"] = str(item.discount_percentage)
             
             line_items.append(line_item)
-        
-        # Validate invoice dates
+
         if not invoice.posting_date:
             frappe.throw(f"Posting date is required for invoice {invoice.name}")
         if not invoice.due_date:
@@ -278,11 +293,11 @@ def create_invoice(doc, method=None):
             invoice_data["CurrencyCode"] = invoice.currency
         
         data = {"Invoices": [invoice_data]}
-        frappe.logger().info(f"Sending invoice data to Xero: {data}")
-        
         try:
-            response = client.make_request("POST", "/Invoices", data=data)
-            frappe.logger().info(f"Xero API response: {response}")
+            if invoice.custom_xero_invoice_number and invoice.workflow_state == "Synced to Xero" and update_invoice:
+                response = client.make_request("POST", f"/Invoices/{invoice.custom_xero_invoice_number}", data=data)
+            else:
+                response = client.make_request("POST", "/Invoices", data=data)
         except Exception as api_error:
             frappe.logger().error(f"Xero API call failed: {str(api_error)}")
             frappe.throw(f"Failed to communicate with Xero API: {str(api_error)}")
@@ -296,22 +311,9 @@ def create_invoice(doc, method=None):
                 "message": f"Invoice created in Xero with ID: {xero_invoice.get('InvoiceID')}"
             }
         
-        # Check for Xero API errors
-        if response and "Elements" in response:
-            # Xero returns errors in Elements array
-            errors = response.get("Elements", [])
-            if errors and len(errors) > 0:
-                error_msg = errors[0].get("ValidationErrors", [{}])[0].get("Message", "Unknown Xero error")
-                frappe.logger().error(f"Xero API validation error: {error_msg}")
-                return {
-                    "status": "error",
-                    "message": f"Xero validation error: {error_msg}"
-                }
-        
-        frappe.logger().error(f"Unexpected Xero API response format: {response}")
         return {
             "status": "error",
-            "message": "Failed to create invoice in Xero - unexpected response format"
+            "message": "Failed to create invoice in Xero"
         }
         
     except Exception as e:
@@ -496,12 +498,10 @@ def cancel_invoice_in_xero(xero_invoice_id):
 def get_customer_contact_id(customer):
     """Get customer contact ID from Xero"""
     try:
-        # First check if the customer has a direct custom_contact_id field
         customer_doc = frappe.get_doc('Customer', customer)
         if customer_doc.get('custom_contact_id'):
             return customer_doc.get('custom_contact_id')
-        
-        # Then check through dynamic links to Contact
+            
         dynamic_links = frappe.get_all('Dynamic Link',
             filters={
                 'link_doctype': 'Customer',
@@ -519,5 +519,4 @@ def get_customer_contact_id(customer):
         
         return None
     except Exception as e:
-        frappe.log_error(f"Error getting contact id for customer {customer}: {str(e)}", "Get Customer Contact ID")
-        frappe.throw(f"Error getting contact id for the selected customer: {str(e)}")
+        frappe.throw("Error getting contact id for the selected customer")

@@ -28,6 +28,7 @@ def before_submit(doc, method=None):
 def on_submit(doc, method=None, sync_to_xero=None):
     """Create invoice in Xero after submission"""
     # Skip if sync is disabled
+    before_submit(doc, method)
     sync_to_xero = sync_to_xero or doc.custom_do_not_sync_to_xero
     if sync_to_xero:
         return
