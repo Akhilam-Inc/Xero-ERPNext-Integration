@@ -78,7 +78,12 @@ fixtures = [
    {
        "doctype": "Property Setter",
        "filters": [["module", "=", "Xero Erpnext Integration"]]
-   }
+   },
+   {"dt": "Workflow", "filters": [["document_type", "=", "Sales Invoice"]]},
+   {"dt": "Workflow State"},
+   {"dt": "Workflow Transition", "filters": [["parent", "=", "Sales Invoice Sync to Xero"]]},
+   {"dt": "Workflow Document State", "filters": [["parent", "=", "Sales Invoice Sync to Xero"]]},
+   {"dt": "Workflow Action Master"},
 ]
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
