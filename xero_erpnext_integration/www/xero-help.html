@@ -34,7 +34,7 @@
 
         /* Header with Akhilam branding */
         .header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%);
+            background: linear-gradient(135deg, #1e3a8a 0%, #074F8B 50%, #1e40af 100%);
             color: white;
             padding: 2rem 0;
             text-align: center;
@@ -184,11 +184,11 @@
             font-size: 2rem;
             margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
-            border-bottom: 3px solid #3b82f6;
+            border-bottom: 3px solid #074F8B;
         }
 
         h3 {
-            color: #334155;
+            color: #fff;
             font-size: 1.5rem;
             margin: 2rem 0 1rem 0;
         }
@@ -211,7 +211,7 @@
             padding: 1.5rem;
             margin: 1rem 0;
             box-shadow: 0 2px 10px rgba(30, 58, 138, 0.1);
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #074F8B;
         }
 
         .card-grid {
@@ -222,7 +222,7 @@
         }
 
         .feature-card {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #1e3a8a 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #074F8B 50%, #1e3a8a 100%);
             color: white;
             text-align: center;
             padding: 2rem;
@@ -264,7 +264,7 @@
         }
 
         th {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #074F8B 100%);
             color: white;
             font-weight: 600;
         }
@@ -277,7 +277,7 @@
         .btn {
             display: inline-block;
             padding: 0.75rem 1.5rem;
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #074F8B 100%);
             color: white;
             text-decoration: none;
             border-radius: 5px;
@@ -321,7 +321,7 @@
             overflow-x: auto;
             margin: 1rem 0;
             font-family: 'Courier New', monospace;
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #074F8B;
         }
 
         code {
@@ -352,7 +352,7 @@
 
         .alert-info {
             background: #eff6ff;
-            border-color: #3b82f6;
+            border-color: #074F8B;
             color: #1e40af;
         }
 
@@ -387,7 +387,7 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(30, 58, 138, 0.1);
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #074F8B;
         }
 
         .step::before {
@@ -395,7 +395,7 @@
             position: absolute;
             left: -15px;
             top: 1.5rem;
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #074F8B 100%);
             color: white;
             width: 30px;
             height: 30px;
@@ -423,7 +423,7 @@
 
         .search-input:focus {
             outline: none;
-            border-color: #3b82f6;
+            border-color: #074F8B;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
@@ -636,15 +636,19 @@ bench install-app xero_erpnext_integration --site your-site-name</code></pre>
             <section id="configuration" class="section">
                 <h2>Configuration</h2>
 
-                <h3><i class="fas fa-magic"></i> Initial Setup Wizard</h3>
+                <h3 class="section-heading text-primary" style="color: #074F8B;"><i class="fas fa-magic"></i> Initial Setup Wizard</h3>
                 <p>After successful authentication, the setup wizard will guide you through the configuration process:</p>
 
                 <div class="steps">
                     <div class="step">
                         <h4>Organization Selection</h4>
                         <ul>
-                            <li>Select the Xero organization to sync with</li>
+                            <li>Go to https://developer.xero.com/app/manage</li>
+                            <li>Select the app in xero to sync with / Create new app if not exists</li>
                             <li>Confirm organization details and currency</li>
+                            <li>Set Application Url to erpnext url, for example: https://xero.akhilaminc.com</li>
+                            <li>Go to Configuration and Set Redirect Url to erpnext url, for example: https://xero.akhilaminc.com/app/xero-settings</li>
+                            <li>Copy the Client ID and Client Secret</li>
                         </ul>
                     </div>
 
@@ -690,7 +694,7 @@ bench install-app xero_erpnext_integration --site your-site-name</code></pre>
                         <li>Cancel Sales Invoice</li>
                         <!-- <li>Billing and shipping addresses</li>
                         <li>Payment terms</li>
-                        <li>Credit limits</li>
+                        <li>Credit limits</li>\
                         <li>Custom fields (configurable)</li> -->
                     </ul>
 
@@ -700,6 +704,7 @@ bench install-app xero_erpnext_integration --site your-site-name</code></pre>
                             <li>Create contact in contact page, check secnd to Xero box, then click on <button class="btn">Send to Xero</button></li>
                             <li>To also create Contact ion sales invoice, click <button class="btn">Sync Contact in Xero</button></li>
                             <li>On Submit of Sales Invoice, If <strong>Do not Sync to Xero</strong> is checked, it will not be synced to Xero for payment</li>
+                            <li>On click of <strong>Sync to Xero</strong> in action, invoice gets submitted and synced to Xero</li>
                             <li>Check the <strong>Xero API Log</strong> for api status</li>
                             <li>Confirm Sales Invoice in Xero, if <strong>Do not Sync to Xero</strong> is uncheckked</li>
                             <li>Cancel Sales Invoice in Frappe/Erpnext, if successful, then confirm in Xero.</li>
